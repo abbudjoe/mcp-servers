@@ -165,7 +165,7 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 ]
 
 [lint.isort]
-known-first-party = ["qiskit_code_assistant_mcp_server", "qiskit_ibm_runtime_mcp_server", "qiskit_gym_mcp_server"]
+known-first-party = ["qiskit_ibm_runtime_mcp_server", "qiskit_gym_mcp_server"]
 force-single-line = false
 lines-after-imports = 2
 section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
