@@ -252,5 +252,4 @@ Each MCP server has simpler examples in its own directory:
 - [`qiskit-ibm-runtime-mcp-server/examples/`](../qiskit-ibm-runtime-mcp-server/examples/) - IBM Quantum Runtime
 - [`qiskit-ibm-transpiler-mcp-server/examples/`](../qiskit-ibm-transpiler-mcp-server/examples/) - AI transpilation
 - [`qiskit-docs-mcp-server/examples/`](../qiskit-docs-mcp-server/examples/) - Documentation retrieval
-- [`qiskit-code-assistant-mcp-server/examples/`](../qiskit-code-assistant-mcp-server/examples/) - Code generation
 - [`qiskit-gym-mcp-server/examples/`](../qiskit-gym-mcp-server/examples/) - RL-based circuit synthesis (community)

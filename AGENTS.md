@@ -36,12 +36,11 @@ qiskit-mcp-servers is a collection of **Model Context Protocol (MCP)** servers t
 
 ### Repository Structure
 
-This is a **monorepo** using uv workspace containing six independent MCP servers:
+This is a **monorepo** using uv workspace containing five independent MCP servers:
 
 ```
 qiskit-mcp-servers/
 ├── qiskit-mcp-server/                       # Core Qiskit transpilation
-├── qiskit-code-assistant-mcp-server/        # AI code completion
 ├── qiskit-docs-mcp-server/                  # Documentation retrieval
 ├── qiskit-ibm-runtime-mcp-server/           # IBM Quantum cloud services
 ├── qiskit-ibm-transpiler-mcp-server/        # AI-powered transpilation
@@ -72,7 +71,6 @@ The root `pyproject.toml` defines a uv workspace:
 [tool.uv.workspace]
 members = [
     "qiskit-mcp-server",
-    "qiskit-code-assistant-mcp-server",
     "qiskit-docs-mcp-server",
     "qiskit-ibm-runtime-mcp-server",
     "qiskit-ibm-transpiler-mcp-server",
@@ -82,8 +80,10 @@ members = [
 
 The root package is also a **meta-package** that installs all servers:
 ```bash
-pip install qiskit-mcp-servers  # Installs all six servers
+pip install qiskit-mcp-servers  # Installs all five servers
 ```
+
+> **Removed:** A `qiskit-code-assistant-mcp-server` previously lived in this monorepo. It was removed because the underlying Qiskit Code Assistant service has been [discontinued by IBM Quantum](https://quantum.cloud.ibm.com/announcements/en/product-updates/2026-04-28-qiskit-code-assistant-service-to-sunset). The PyPI package `qiskit-code-assistant-mcp-server` is archived. Do not re-introduce references to it.
 
 ### Component Structure
 
@@ -153,43 +153,7 @@ Each MCP server follows this standard structure:
 
 ---
 
-### 2. Qiskit Code Assistant MCP Server
-
-**Purpose**: Intelligent quantum code completion and assistance
-
-**Directory**: [`qiskit-code-assistant-mcp-server/`](qiskit-code-assistant-mcp-server/)
-
-**Core Files**:
-- `server.py`: FastMCP server with tool/resource definitions
-- `qca.py`: Qiskit Code Assistant API integration (async)
-- `constants.py`: API endpoints and configuration
-- `utils.py`: HTTP client management and utilities
-
-**Tools Provided**:
-| Tool | Description |
-|------|-------------|
-| `get_completion_tool` | Get code completion for quantum code prompts |
-| `get_rag_completion_tool` | RAG-based completion with documentation context |
-| `accept_completion_tool` | Mark a completion as accepted (telemetry) |
-| `accept_model_disclaimer_tool` | Accept disclaimer for a model |
-
-**Resources Provided**:
-| Resource URI | Description |
-|--------------|-------------|
-| `qca://status` | Service status and connection info |
-| `qca://models` | List available models |
-| `qca://model/{model_id}` | Specific model information |
-| `qca://disclaimer/{model_id}` | Model disclaimer information |
-
-**Environment Variables**:
-- `QISKIT_IBM_TOKEN`: IBM Quantum API token (required)
-- `QCA_TOOL_API_BASE`: API base URL (default: https://qiskit-code-assistant.quantum.ibm.com)
-- `QCA_TOOL_MODEL_NAME`: Model to use for completions
-- `QCA_MCP_DEBUG_LEVEL`: Logging level (default: INFO)
-
----
-
-### 3. Qiskit Documentation MCP Server
+### 2. Qiskit Documentation MCP Server
 
 **Purpose**: Query and retrieve Qiskit documentation, guides, and API references
 
@@ -237,7 +201,7 @@ Each MCP server follows this standard structure:
 
 ---
 
-### 4. Qiskit IBM Runtime MCP Server
+### 3. Qiskit IBM Runtime MCP Server
 
 **Purpose**: Complete access to IBM Quantum cloud services
 
@@ -304,7 +268,7 @@ Each MCP server follows this standard structure:
 
 ---
 
-### 5. Qiskit IBM Transpiler MCP Server
+### 4. Qiskit IBM Transpiler MCP Server
 
 **Purpose**: AI-powered circuit transpilation with routing and synthesis
 
@@ -341,7 +305,7 @@ Each MCP server follows this standard structure:
 
 ---
 
-### 6. Qiskit Gym MCP Server
+### 5. Qiskit Gym MCP Server
 
 **Purpose**: Reinforcement learning-based quantum circuit synthesis
 
@@ -467,17 +431,6 @@ AI Assistant → MCP Client → transpile_circuit_tool
                          Transpiled circuit (QPY format)
 ```
 
-### Qiskit Code Assistant Server
-```
-AI Assistant → MCP Client → get_completion_tool
-                                  ↓
-                            qca.py (async functions)
-                                  ↓
-                    IBM Qiskit Code Assistant API
-                                  ↓
-                        Code completion response
-```
-
 ### Qiskit Documentation Server
 ```
 AI Assistant → MCP Client → search_docs_tool / get_page_tool
@@ -559,7 +512,6 @@ AI Assistant → MCP Client → create_*_env_tool → start_training_tool
    ```bash
    # Run specific servers
    uv run qiskit-mcp-server
-   uv run qiskit-code-assistant-mcp-server
    uv run qiskit-ibm-runtime-mcp-server
    uv run qiskit-ibm-transpiler-mcp-server
    uv run qiskit-docs-mcp-server
@@ -830,7 +782,6 @@ When adding a new MCP server, you must update the following GitHub configuration
    | Server | Release Tag Pattern |
    |--------|---------------------|
    | qiskit-mcp-server | `qiskit-v*` |
-   | qiskit-code-assistant-mcp-server | `code-assistant*` |
    | qiskit-ibm-runtime-mcp-server | `runtime*` |
    | qiskit-ibm-transpiler-mcp-server | `transpiler*` |
    | qiskit-docs-mcp-server | `docs*` |
@@ -978,7 +929,7 @@ Each server is also published to the [MCP Registry](https://registry.modelcontex
 
 **Automated publishing** (recommended):
 - Publishing happens automatically via GitHub Actions when a release is created
-- Uses the same release tags as PyPI (`qiskit-v*`, `code-assistant*`, `runtime*`, `transpiler*`, `docs*`, `gym*`)
+- Uses the same release tags as PyPI (`qiskit-v*`, `runtime*`, `transpiler*`, `docs*`, `gym*`)
 - Uses GitHub OIDC authentication (no secrets required)
 
 **Manual publishing**:
@@ -1016,7 +967,6 @@ Each server has a `server.json` file that defines its MCP Registry metadata:
 
 ### Server-Specific Documentation
 - `qiskit-mcp-server/README.md`: Core Qiskit server docs
-- `qiskit-code-assistant-mcp-server/README.md`: Code Assistant server docs
 - `qiskit-ibm-runtime-mcp-server/README.md`: IBM Runtime server docs
 - `qiskit-ibm-transpiler-mcp-server/README.md`: IBM Transpiler server docs
 - `qiskit-docs-mcp-server/README.md`: Documentation server docs
@@ -1152,25 +1102,6 @@ qiskit-mcp-servers/
 │   │   └── langchain_agent.py
 │   ├── pyproject.toml
 │   ├── server.json                      # MCP Registry metadata
-│   ├── LICENSE
-│   ├── README.md
-│   └── run_tests.sh
-├── qiskit-code-assistant-mcp-server/
-│   ├── src/qiskit_code_assistant_mcp_server/
-│   │   ├── __init__.py
-│   │   ├── server.py                    # FastMCP server
-│   │   ├── qca.py                       # Core async functions
-│   │   ├── constants.py                 # Configuration
-│   │   └── utils.py                     # Utilities
-│   ├── tests/
-│   │   ├── conftest.py
-│   │   └── test_*.py
-│   ├── examples/
-│   │   ├── README.md
-│   │   ├── langchain_agent.ipynb
-│   │   └── langchain_agent.py
-│   ├── pyproject.toml
-│   ├── pytest.ini
 │   ├── LICENSE
 │   ├── README.md
 │   └── run_tests.sh

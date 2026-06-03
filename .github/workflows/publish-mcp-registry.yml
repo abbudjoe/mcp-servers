@@ -13,7 +13,6 @@ on:
         options:
           - all
           - qiskit
-          - code-assistant
           - docs
           - runtime
           - transpiler
@@ -47,35 +46,6 @@ jobs:
 
     - name: Publish to MCP Registry
       working-directory: ./qiskit-mcp-server
-      run: mcp-publisher publish
-
-  publish-code-assistant-mcp-registry:
-    if: |
-      (github.event_name == 'release' && contains(github.ref, 'code-assistant')) ||
-      (github.event_name == 'workflow_dispatch' && (github.event.inputs.package == 'all' || github.event.inputs.package == 'code-assistant'))
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write  # Required for GitHub OIDC authentication
-      contents: read
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Wait for PyPI availability
-      working-directory: ./qiskit-code-assistant-mcp-server
-      run: ${{ github.workspace }}/.github/scripts/wait-for-pypi.sh
-
-    - name: Download mcp-publisher
-      run: |
-        curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
-        sudo mv mcp-publisher /usr/local/bin/
-        mcp-publisher --help
-
-    - name: Login to MCP Registry (OIDC)
-      run: mcp-publisher login github-oidc
-
-    - name: Publish to MCP Registry
-      working-directory: ./qiskit-code-assistant-mcp-server
       run: mcp-publisher publish
 
   publish-runtime-mcp-registry:

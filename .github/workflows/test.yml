@@ -24,8 +24,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        cd qiskit-code-assistant-mcp-server && uv sync --group dev
-        cd ../qiskit-docs-mcp-server && uv sync --group dev
+        cd qiskit-docs-mcp-server && uv sync --group dev
         cd ../qiskit-ibm-runtime-mcp-server && uv sync --group dev
         cd ../qiskit-ibm-transpiler-mcp-server && uv sync --group dev
         cd ../qiskit-mcp-server && uv sync --group dev
@@ -33,8 +32,7 @@ jobs:
 
     - name: Run ruff linting
       run: |
-        cd qiskit-code-assistant-mcp-server && uv run ruff check src tests
-        cd ../qiskit-docs-mcp-server && uv run ruff check src tests
+        cd qiskit-docs-mcp-server && uv run ruff check src tests
         cd ../qiskit-ibm-runtime-mcp-server && uv run ruff check src tests
         cd ../qiskit-ibm-transpiler-mcp-server && uv run ruff check src tests
         cd ../qiskit-mcp-server && uv run ruff check src tests
@@ -42,8 +40,7 @@ jobs:
 
     - name: Run ruff formatting check
       run: |
-        cd qiskit-code-assistant-mcp-server && uv run ruff format --check src tests
-        cd ../qiskit-docs-mcp-server && uv run ruff format --check src tests
+        cd qiskit-docs-mcp-server && uv run ruff format --check src tests
         cd ../qiskit-ibm-runtime-mcp-server && uv run ruff format --check src tests
         cd ../qiskit-ibm-transpiler-mcp-server && uv run ruff format --check src tests
         cd ../qiskit-mcp-server && uv run ruff format --check src tests
@@ -51,8 +48,7 @@ jobs:
 
     - name: Run type checking
       run: |
-        cd qiskit-code-assistant-mcp-server && uv run mypy --config-file ../mypy.ini src
-        cd ../qiskit-docs-mcp-server && uv run mypy --config-file ../mypy.ini src
+        cd qiskit-docs-mcp-server && uv run mypy --config-file ../mypy.ini src
         cd ../qiskit-ibm-runtime-mcp-server && uv run mypy --config-file ../mypy.ini src
         cd ../qiskit-ibm-transpiler-mcp-server && uv run mypy --config-file ../mypy.ini src
         cd ../qiskit-mcp-server && uv run mypy --config-file ../mypy.ini src
@@ -60,50 +56,11 @@ jobs:
 
     - name: Run security checks
       run: |
-        cd qiskit-code-assistant-mcp-server && uv run bandit -c pyproject.toml -r src
-        cd ../qiskit-docs-mcp-server && uv run bandit -c pyproject.toml -r src
+        cd qiskit-docs-mcp-server && uv run bandit -c pyproject.toml -r src
         cd ../qiskit-ibm-runtime-mcp-server && uv run bandit -c pyproject.toml -r src
         cd ../qiskit-ibm-transpiler-mcp-server && uv run bandit -c pyproject.toml -r src
         cd ../qiskit-mcp-server && uv run bandit -c pyproject.toml -r src
         cd ../qiskit-gym-mcp-server && uv run bandit -c pyproject.toml -r src
-
-  test-code-assistant:
-    runs-on: ubuntu-latest
-    needs: lint
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Install uv
-      uses: astral-sh/setup-uv@v3
-      with:
-        version: "latest"
-        enable-cache: true
-
-    - name: Set up Python ${{ matrix.python-version }}
-      run: uv python install ${{ matrix.python-version }}
-
-    - name: Install dependencies for Code Assistant server
-      working-directory: ./qiskit-code-assistant-mcp-server
-      run: |
-        uv sync --group dev --group test
-
-    - name: Run tests for Code Assistant server
-      working-directory: ./qiskit-code-assistant-mcp-server
-      env:
-          QISKIT_IBM_TOKEN: ${{ secrets.QISKIT_IBM_TOKEN }}
-      run: |
-        uv run pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
-
-    - name: Upload coverage for Code Assistant server
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./qiskit-code-assistant-mcp-server/coverage.xml
-        flags: code-assistant
-        name: code-assistant-coverage
 
   test-runtime:
     runs-on: ubuntu-latest

@@ -9,7 +9,6 @@
 [![qiskit-mcp-server](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=qiskit-mcp-server&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-mcp-server)
 [![qiskit-ibm-runtime-mcp-server](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-ibm-runtime-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=qiskit-ibm-runtime-mcp-server&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-ibm-runtime-mcp-server)
 [![qiskit-ibm-transpiler-mcp-server](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-ibm-transpiler-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=qiskit-ibm-transpiler-mcp-server&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-ibm-transpiler-mcp-server)
-[![qiskit-code-assistant-mcp-server](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-code-assistant-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=qiskit-code-assistant-mcp-server&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-code-assistant-mcp-server)
 [![qiskit-docs-mcp-server](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-docs-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=qiskit-docs-mcp-server&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-docs-mcp-server)
 [![qiskit-gym-mcp-server](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0.1%2Fservers%2Fio.github.Qiskit%252Fqiskit-gym-mcp-server%2Fversions%2Flatest&query=%24.server.version&label=qiskit-gym-mcp-server&logo=modelcontextprotocol)](https://registry.modelcontextprotocol.io/?q=io.github.Qiskit%2Fqiskit-gym-mcp-server)
 
@@ -20,7 +19,7 @@ A collection of [Model Context Protocol (MCP)](https://modelcontextprotocol.io/i
 ### Prerequisites
 
 - **Python 3.10+** (3.11+ recommended)
-- **IBM Quantum account** and [API token](https://quantum.ibm.com) (only required for IBM cloud servers: Runtime, Transpiler, Code Assistant)
+- **IBM Quantum account** and [API token](https://quantum.ibm.com) (only required for IBM cloud servers: Runtime, Transpiler)
 
 ### Install from PyPI
 
@@ -37,7 +36,6 @@ pip install qiskit-mcp-servers
 
 ```bash
 pip install "qiskit-mcp-servers[qiskit]"          # Qiskit server only
-pip install "qiskit-mcp-servers[code-assistant]"  # Code Assistant server only
 pip install "qiskit-mcp-servers[runtime]"         # IBM Runtime server only
 pip install "qiskit-mcp-servers[transpiler]"      # IBM Transpiler server only
 pip install "qiskit-mcp-servers[docs]"            # Documentation server only
@@ -79,7 +77,6 @@ claude mcp add qiskit-docs -- uvx qiskit-docs-mcp-server
 claude mcp add qiskit-gym -- uvx qiskit-gym-mcp-server
 
 # Require QISKIT_IBM_TOKEN (https://quantum.ibm.com)
-claude mcp add qiskit-code-assistant -e QISKIT_IBM_TOKEN=$QISKIT_IBM_TOKEN -- uvx qiskit-code-assistant-mcp-server
 claude mcp add qiskit-ibm-runtime -e QISKIT_IBM_TOKEN=$QISKIT_IBM_TOKEN -- uvx qiskit-ibm-runtime-mcp-server
 claude mcp add qiskit-ibm-transpiler -e QISKIT_IBM_TOKEN=$QISKIT_IBM_TOKEN -- uvx qiskit-ibm-transpiler-mcp-server
 ```
@@ -108,15 +105,6 @@ Add to your `~/.bob/settings/mcp_settings.json`:
         "qiskit-gym": {
             "command": "uvx",
             "args": ["qiskit-gym-mcp-server"],
-            "alwaysAllow": [],
-            "disabled": false
-        },
-        "qiskit-code-assistant": {
-            "command": "uvx",
-            "args": ["qiskit-code-assistant-mcp-server"],
-            "env": {
-                "QISKIT_IBM_TOKEN": "<your IBM Quantum token>"
-            },
             "alwaysAllow": [],
             "disabled": false
         },
@@ -163,13 +151,6 @@ Add to your `claude_desktop_config.json`:
       "command": "uvx",
       "args": ["qiskit-gym-mcp-server"]
     },
-    "qiskit-code-assistant": {
-      "command": "uvx",
-      "args": ["qiskit-code-assistant-mcp-server"],
-      "env": {
-        "QISKIT_IBM_TOKEN": "your_ibm_quantum_token_here"
-      }
-    },
     "qiskit-ibm-runtime": {
       "command": "uvx",
       "args": ["qiskit-ibm-runtime-mcp-server"],
@@ -209,7 +190,6 @@ npx @modelcontextprotocol/inspector uvx qiskit-ibm-runtime-mcp-server
 | Server | Description | Directory |
 |--------|-------------|-----------|
 | **Qiskit MCP Server** | Circuit creation, transpilation, and serialization (QASM3, QPY) using [Qiskit](https://github.com/Qiskit/qiskit) | [`qiskit-mcp-server/`](./qiskit-mcp-server/) |
-| **Qiskit Code Assistant** | AI-assisted quantum programming via [IBM Qiskit Code Assistant](https://quantum.cloud.ibm.com/docs/en/guides/qiskit-code-assistant) | [`qiskit-code-assistant-mcp-server/`](./qiskit-code-assistant-mcp-server/) |
 | **Qiskit IBM Runtime** | Full access to IBM Quantum hardware via [Qiskit IBM Runtime](https://github.com/Qiskit/qiskit-ibm-runtime/) | [`qiskit-ibm-runtime-mcp-server/`](./qiskit-ibm-runtime-mcp-server/) |
 | **Qiskit IBM Transpiler** | AI-optimized circuit routing and optimization via [qiskit-ibm-transpiler](https://github.com/Qiskit/qiskit-ibm-transpiler) | [`qiskit-ibm-transpiler-mcp-server/`](./qiskit-ibm-transpiler-mcp-server/) |
 | **Qiskit Docs** | Search and retrieve [Qiskit documentation](https://quantum.cloud.ibm.com/docs/), guides, and API references. No auth required. | [`qiskit-docs-mcp-server/`](./qiskit-docs-mcp-server/) |
@@ -219,6 +199,10 @@ npx @modelcontextprotocol/inspector uvx qiskit-ibm-runtime-mcp-server
 | Server | Description | Directory |
 |--------|-------------|-----------|
 | **Qiskit Gym** | RL-based quantum circuit synthesis using [qiskit-gym](https://github.com/rl-institut/qiskit-gym) (permutation routing, linear functions, Clifford circuits) | [`qiskit-gym-mcp-server/`](./qiskit-gym-mcp-server/) |
+
+### Removed Servers
+
+- **Qiskit Code Assistant MCP Server** — previously published as `qiskit-code-assistant-mcp-server`. Removed because the underlying Qiskit Code Assistant service has been discontinued by IBM Quantum. See the [sunset announcement](https://quantum.cloud.ibm.com/announcements/en/product-updates/2026-04-28-qiskit-code-assistant-service-to-sunset). The PyPI package is archived and no longer maintained.
 
 ## Examples
 
@@ -240,7 +224,7 @@ All servers are built on [FastMCP](https://github.com/jlowin/fastmcp) and share 
 
 ### Running Tests
 ```bash
-cd qiskit-code-assistant-mcp-server  # or any server directory
+cd qiskit-mcp-server  # or any server directory
 ./run_tests.sh
 ```
 
@@ -254,7 +238,6 @@ cd qiskit-code-assistant-mcp-server  # or any server directory
 
 - [Model Context Protocol](https://modelcontextprotocol.io/introduction) — understanding MCP
 - [Qiskit IBM Runtime docs](https://quantum.cloud.ibm.com/docs/en/api/qiskit-ibm-runtime) — quantum cloud services
-- [Qiskit Code Assistant docs](https://quantum.cloud.ibm.com/docs/en/guides/qiskit-code-assistant) — AI code assistance
 - [MCP Inspector](https://github.com/modelcontextprotocol/inspector) — interactive testing tool
 - [FastMCP](https://github.com/jlowin/fastmcp) — high-performance MCP framework
 - [AGENTS.md](AGENTS.md) — guidance for AI coding assistants (IBM Bob, Claude Code, Copilot, Cursor, and others)

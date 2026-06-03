@@ -29,8 +29,6 @@ Before you begin, ensure you have the following installed:
    ```bash
    cd qiskit-mcp-server
    # OR
-   cd qiskit-code-assistant-mcp-server
-   # OR
    cd qiskit-ibm-runtime-mcp-server
    # OR
    cd qiskit-ibm-transpiler-mcp-server
@@ -55,8 +53,6 @@ Before you begin, ensure you have the following installed:
    ```bash
    uv run qiskit-mcp-server
    # OR
-   uv run qiskit-code-assistant-mcp-server
-   # OR
    uv run qiskit-ibm-runtime-mcp-server
    # OR
    uv run qiskit-ibm-transpiler-mcp-server
@@ -68,7 +64,7 @@ Before you begin, ensure you have the following installed:
 
 6. **Test interactively with MCP Inspector** (requires Node.js):
    ```bash
-   npx @modelcontextprotocol/inspector uv run qiskit-code-assistant-mcp-server
+   npx @modelcontextprotocol/inspector uv run qiskit-mcp-server
    ```
 
 ## Contributing Workflow
@@ -185,7 +181,6 @@ This is a monorepo with multiple independent MCP servers:
 ```
 qiskit-mcp-servers/
 ├── qiskit-mcp-server/                   # Core Qiskit server with circuit utilities
-├── qiskit-code-assistant-mcp-server/    # AI code completion server
 ├── qiskit-ibm-runtime-mcp-server/       # IBM Quantum cloud services
 ├── qiskit-ibm-transpiler-mcp-server/    # AI-powered transpilation
 ├── qiskit-docs-mcp-server/              # Documentation retrieval
