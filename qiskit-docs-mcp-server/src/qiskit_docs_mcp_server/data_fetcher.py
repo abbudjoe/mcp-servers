@@ -324,21 +324,31 @@ def _normalize_result_url(url_val: Any, base: str) -> Any:
 
 
 def _build_result_entry(item: dict[str, Any], query: str, detail: str, base: str) -> dict[str, Any]:
-    """Build a single search-result entry with a snippet (or full text)."""
-    entry: dict[str, Any] = {
-        key: item[key] for key in _RESULT_META_FIELDS if item.get(key) is not None
-    }
+    """Build a single search-result entry.
+
+    In ``snippet`` mode (default) the entry is trimmed to a small set of
+    navigation fields plus a short ``snippet`` — token-economical for agent use.
+    In ``full`` mode the original upstream fields are preserved (backwards
+    compatible with the pre-snippet response) and the full page body is returned
+    as ``text``. Either way the upstream ``item`` is not mutated (dict/comprehension
+    copies), so cached search responses stay intact.
+    """
+    if detail == "full":
+        # Preserve all upstream fields for backwards compatibility.
+        entry: dict[str, Any] = dict(item)
+        raw_text = item.get("text")
+        if isinstance(raw_text, str):
+            entry["text"] = _strip_html_tags(raw_text)
+    else:
+        entry = {key: item[key] for key in _RESULT_META_FIELDS if item.get(key) is not None}
+        raw_text = item.get("text")
+        clean_text = _strip_html_tags(raw_text) if isinstance(raw_text, str) else ""
+        entry["snippet"] = _make_snippet(clean_text, query)
+
     if isinstance(entry.get("title"), str):
         entry["title"] = _strip_html_tags(entry["title"])
     if "url" in entry:
         entry["url"] = _normalize_result_url(entry["url"], base)
-
-    raw_text = item.get("text")
-    clean_text = _strip_html_tags(raw_text) if isinstance(raw_text, str) else ""
-    if detail == "full":
-        entry["text"] = clean_text
-    else:
-        entry["snippet"] = _make_snippet(clean_text, query)
     return entry
 
 
@@ -360,9 +370,11 @@ async def search_qiskit_docs(
             'all', 'documentation', 'api', 'learning', 'tutorials'
         top_k: Maximum number of results to return (clamped to
             [1, MAX_SEARCH_TOP_K]). Defaults to DEFAULT_SEARCH_TOP_K.
-        detail: 'snippet' (default) returns a short excerpt per result;
-            'full' returns each result's full page body (heavier — prefer
-            get_page for full content).
+        detail: 'snippet' (default) returns a short excerpt per result and a
+            trimmed field set; 'full' returns each result's full page body as
+            'text' and preserves the original upstream fields (backwards
+            compatible with the pre-snippet response — heavier, so prefer
+            get_page for a single page's full content).
 
     Returns:
         Search results with matching entries, counts, and metadata.

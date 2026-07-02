@@ -904,6 +904,28 @@ class TestSearchSnippetsAndPaging:
             assert len(entry["text"]) > SNIPPET_MAX_CHARS
 
     @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
+    async def test_detail_full_preserves_upstream_fields(self, mock_fetch):
+        """detail='full' is backwards compatible: original fields pass through."""
+        mock_fetch.return_value = [
+            {
+                "url": "/docs/api/qiskit/circuit",
+                "title": "circuit",
+                "text": "body",
+                "language": "en",
+                "package": "qiskit",
+                "package-version": "current",
+            },
+        ]
+        result = await search_qiskit_docs("circuit", detail="full")
+        entry = result["results"][0]
+        # Fields dropped in snippet mode are retained in full mode.
+        assert entry["language"] == "en"
+        assert entry["package"] == "qiskit"
+        assert entry["package-version"] == "current"
+        # URL is still normalized to an absolute URL.
+        assert entry["url"].startswith("https://")
+
+    @patch("qiskit_docs_mcp_server.data_fetcher.fetch_text_json")
     async def test_detail_full_strips_html(self, mock_fetch):
         """detail='full' still strips HTML tags from the body."""
         mock_fetch.return_value = [

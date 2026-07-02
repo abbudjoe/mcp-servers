@@ -113,8 +113,9 @@ async def search_docs_tool(
             'tutorials' — Tutorial content only
         top_k: Maximum number of results to return (default: 5, capped at 10).
         detail: Per-result content level. 'snippet' (default) returns a short
-            excerpt; 'full' returns each result's full page body — heavier, so
-            prefer get_page_tool when you only need one page in full.
+            excerpt and a trimmed field set; 'full' returns each result's full
+            page body as 'text' and preserves all original fields (backwards
+            compatible) — heavier, so prefer get_page_tool for a single page.
 
     Returns:
         Matching documentation entries (id, url, title, pageTitle, module,
