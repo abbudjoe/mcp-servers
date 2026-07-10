@@ -33,11 +33,10 @@ class TestServerRegistration:
         assert "lookup_error_code_tool" in mcp.instructions
         assert "qiskit-docs://" in mcp.instructions
 
-    def test_tools_registered(self):
+    async def test_tools_registered(self):
         """Test that all expected tools are registered."""
-        # NOTE: Accessing FastMCP internals for introspection. Update if FastMCP
-        # exposes a public API for listing registered tools/resources.
-        tool_names = {tool.name for tool in mcp._tool_manager._tools.values()}
+        tools = await mcp.list_tools()
+        tool_names = {t.name for t in tools}
         expected_tools = {
             "search_docs_tool",
             "get_page_tool",
@@ -45,11 +44,10 @@ class TestServerRegistration:
         }
         assert expected_tools.issubset(tool_names), f"Missing tools: {expected_tools - tool_names}"
 
-    def test_resources_registered(self):
+    async def test_resources_registered(self):
         """Test that all expected resources are registered."""
-        # NOTE: Accessing FastMCP internals for introspection. Update if FastMCP
-        # exposes a public API for listing registered tools/resources.
-        resource_uris = set(mcp._resource_manager._resources.keys())
+        resources = await mcp.list_resources()
+        resource_uris = {str(r.uri) for r in resources}
         expected_resources = {
             "qiskit-docs://modules",
             "qiskit-docs://addons",
@@ -62,21 +60,20 @@ class TestServerRegistration:
             f"Missing resources: {expected_resources - resource_uris}"
         )
 
-    def test_tool_count(self):
+    async def test_tool_count(self):
         """Test the expected number of tools."""
-        # NOTE: Accessing FastMCP internals for introspection. Update if FastMCP
-        # exposes a public API for listing registered tools/resources.
-        assert len(mcp._tool_manager._tools) == 3
+        tools = await mcp.list_tools()
+        assert len(tools) == 3
 
-    def test_resource_count(self):
+    async def test_resource_count(self):
         """Test the expected number of resources."""
-        assert len(mcp._resource_manager._resources) == 6
+        resources = await mcp.list_resources()
+        assert len(resources) == 6
 
-    def test_old_tools_removed(self):
+    async def test_old_tools_removed(self):
         """Test that old category-specific tools are no longer registered."""
-        # NOTE: Accessing FastMCP internals for introspection. Update if FastMCP
-        # exposes a public API for listing registered tools/resources.
-        tool_names = {tool.name for tool in mcp._tool_manager._tools.values()}
+        tools = await mcp.list_tools()
+        tool_names = {t.name for t in tools}
         removed_tools = {
             "get_sdk_module_docs_tool",
             "get_addon_docs_tool",
@@ -86,9 +83,10 @@ class TestServerRegistration:
             f"Old tools still registered: {removed_tools & tool_names}"
         )
 
-    def test_prompts_registered(self):
+    async def test_prompts_registered(self):
         """Test that all expected prompts are registered."""
-        prompt_names = set(mcp._prompt_manager._prompts.keys())
+        prompts = await mcp.list_prompts()
+        prompt_names = {p.name for p in prompts}
         expected_prompts = {
             "explain_error",
             "module_overview",
@@ -98,13 +96,15 @@ class TestServerRegistration:
             f"Missing prompts: {expected_prompts - prompt_names}"
         )
 
-    def test_prompt_count(self):
+    async def test_prompt_count(self):
         """Test the expected number of prompts."""
-        assert len(mcp._prompt_manager._prompts) == 3
+        prompts = await mcp.list_prompts()
+        assert len(prompts) == 3
 
-    def test_resource_templates_registered(self):
+    async def test_resource_templates_registered(self):
         """Test that all expected resource templates are registered."""
-        template_uris = set(mcp._resource_manager._templates.keys())
+        templates = await mcp.list_resource_templates()
+        template_uris = {str(t.uri_template) for t in templates}
         expected_templates = {
             "qiskit-docs://modules/{module_name}",
             "qiskit-docs://guides/{guide_name}",
