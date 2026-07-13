@@ -37,6 +37,19 @@ Before sync, the fork/local head was 0 commits ahead and 2 commits behind upstre
 local branch was fast-forwarded with `git merge --ff-only upstream/main`; it is now identical
 to upstream and 2 commits ahead of the fork remote. Nothing was pushed.
 
+The refs were fetched again after the initial report commit and before the final report
+refinement to establish this revalidation point:
+
+| Revalidation ref | Commit | Divergence from `upstream/main` |
+|---|---|---:|
+| Fork default `origin/main` | `fbf6b8fc31ef9acfc5dc5bd16d6fb608f4f3380d` | 0 ahead, 2 behind |
+| `upstream/main` | `ba3dc9763ffefe56cdc559d4a88352dec62931c2` | identical |
+| Local/tracking `codex/w1-00-runtime-baseline` before final refinement | `ababb3f819ef8d236a3c951f0a7d9bfbfbce4cf4` | 1 ahead, 0 behind |
+
+At that revalidation point, the one W1 branch commit beyond upstream was this report only and
+the branch was identical to `origin/codex/w1-00-runtime-baseline`. The fork default branch
+remained unsynchronized because W1-00 did not authorize pushing or rewriting `origin/main`.
+
 The two incorporated commits are:
 
 1. [`6ad63ed`](https://github.com/Qiskit/mcp-servers/commit/6ad63ed38bac7e68e42f878d22c0706406406b7c) — upgrade every server to FastMCP 3.2+ and migrate registration tests to public FastMCP APIs.
@@ -49,6 +62,16 @@ This agrees with the official
 [FastMCP 2-to-3 migration guide](https://gofastmcp.com/getting-started/upgrading/from-fastmcp-2).
 The upstream post-merge [CI run](https://github.com/Qiskit/mcp-servers/actions/runs/29236339908)
 reports 24 successful checks.
+
+The latest repository release notes were also reviewed. Meta-package
+[0.11.0](https://github.com/Qiskit/mcp-servers/releases/tag/meta-v0.11.0) removes the retired
+Code Assistant server; Runtime wrapper
+[0.6.0](https://github.com/Qiskit/mcp-servers/releases/tag/runtime-v0.6.0) replaces the retired
+`ibm_torino` backend, adds FastMCP instructions, prompts, and resource templates; and core Qiskit
+wrapper [0.3.0](https://github.com/Qiskit/mcp-servers/releases/tag/qiskit-v0.3.0) adds FastMCP
+instructions and prompts. PR #220 is newer than those tags. Its diff changes dependency and
+test compatibility surfaces only: it contains no Qiskit transpiler behavior or IBM Runtime
+submission/result implementation change.
 
 ## Locked Python 3.12 baseline
 
@@ -172,9 +195,12 @@ map to W1-02, W1-05, and W1-08.
 
 - Runtime CI injects `QISKIT_IBM_TOKEN` into 206 mock/fake-backed tests even though static
   inspection found no test requiring a real Runtime credential or network call.
-- IBM Transpiler CI runs 52 authenticated integration tests using a real backend/service,
-  contrary to the repository skill's rule that external IBM services be mocked in ordinary
-  tests.
+- IBM Transpiler CI injects a real token into a 52-case integration suite. Thirty-eight cases
+  can reach real backend/service resolution: 16 have outcomes that visibly depend on
+  credentials, while 22 error-path cases pass without credentials for the wrong reason because
+  an early authentication failure satisfies broad assertions. Only 14 cases are genuinely
+  mocked or local-validation-only. Running the 38 service-coupled cases in ordinary CI
+  conflicts with the repository rule that external IBM services be mocked in ordinary tests.
 - There is no dependency-advisory or repository secret scan in CI.
 - GitHub Actions are tag-pinned rather than commit-SHA-pinned; uv is requested as `latest`.
 - The MCP registry publish workflow downloads and executes an unchecked `latest` binary in
@@ -217,9 +243,9 @@ Pre-existing failures and warnings:
   function-scoped event loops. The second live test failed with `Event loop is closed`; the
   same test passed alone. Ordinary CI hides this because Docs config deselects integration.
 - Twelve IBM Transpiler integration tests require credentials/backend resolution and failed
-  as expected under the isolated credential-free home. Thirty-six input/error-path tests
-  passed and four existing hybrid cases xfailed. No primitive submission exists in this
-  suite.
+  as expected under the isolated credential-free home. Of 36 passing cases, source review
+  found 22 service-coupled false greens and only 14 genuinely local/mocked cases; four more
+  credential-dependent hybrid cases xfailed. No primitive submission exists in this suite.
 - Runtime tests passed but emitted unawaited-coroutine warnings from sync-wrapper tests.
 - Core Qiskit tests emitted 47 deprecation warnings for the Runtime fractional-translation
   plugin, which is deprecated as of Runtime 0.42.0.
@@ -299,6 +325,7 @@ External test evidence:
 | Docs: `env -u QISKIT_IBM_TOKEN uv run --locked pytest tests/ -m integration -q --no-cov` | 1 | 2 passed, 1 failed, 173 deselected. |
 | Docs diagnostic: `env -u QISKIT_IBM_TOKEN uv run --locked pytest tests/test_data_fetcher.py::TestIntegration::test_get_page_docs_live -m integration -q --no-cov` | 0 | The event-loop failure passes in isolation, confirming shared-client lifecycle as the suite-order root cause. |
 | IBM Transpiler: `env -u QISKIT_IBM_TOKEN HOME="$isolated_home" uv run --locked pytest tests/ -m integration -q --no-cov`, where `isolated_home` came from `mktemp -d -t qiskit-w1-00-no-creds` | 1 | 36 passed, 12 credential-dependent failures, 4 xfailed, 139 deselected. The empty home prevented saved-credential discovery. |
+| IBM Transpiler xfail audit: same isolated command with `--runxfail` | 1 | 36 passed, 16 credential-dependent failures, 139 deselected. This proves all four non-strict hybrid xfails mask the same pre-backend credential failure. |
 
 ### Security commands
 
@@ -340,23 +367,48 @@ cloud, Runtime, or QPU call.
 
 ## Test classification for follow-up
 
-### W1-01
+The scan distinguishes tests that need a real credential from mocked tests that encode the
+current raw-token contract. Placeholder values such as `test_token` are fixtures, not secrets.
 
-- Remove the production token from ordinary Runtime CI.
-- Establish one canonical lock and delete or regenerate stale package-local locks.
-- Add locked-version guards for FastMCP registration, Primitive V2 PUB/result shapes, and
-  QPY compatibility.
-- Correct Python 3.14 matrix/workspace constraints and pin uv.
-- Make read-only network tests separately gated and repair their client/event-loop lifecycle.
+### Credential-dependent outcomes and hidden service coupling
 
-### W1-02
+Sixteen IBM Transpiler integration tests have outcomes that visibly depend on credentials
+when both `QISKIT_IBM_TOKEN` and saved Qiskit credentials are unavailable. Twelve fail
+normally and four are hidden by unconditional, non-strict xfail markers:
 
-- Replace tests that preserve token arguments/persistence, destructive account deletion,
-  token-suffix disclosure, implicit instance selection, and superficial callable-only tool
-  registration.
-- Add exact public FastMCP research/admin tool-list tests, negative token/delete assertions,
-  environment authentication without persistence, exception/log redaction tests, explicit
-  instance ownership tests, and a network-denial fixture.
+| Test group | Count | Classification and remediation owner |
+|---|---:|---|
+| `tests/integration/test_mcp_server.py::TestEndToEndScenarios::test_complete_synthesis_pass` | 1 | W1-01 must gate authenticated integration separately; W1-02 must remove account setup/token mutation from the research profile. |
+| `tests/integration/test_qta.py`: the successful routing tests (including explicit coupling map) and successful Clifford, linear-function, permutation, and Pauli-network synthesis tests | 6 | W1-01 must replace ordinary-CI credential dependence with deterministic fakes/fixtures, retaining any separately authorized external compatibility suite. |
+| `tests/integration/test_sync.py`: successful routing, Clifford, linear-function, permutation, and Pauli-network sync-wrapper tests | 5 | W1-01 must apply the same deterministic/external-suite split and lock/API guards. |
+| `tests/integration/test_qta.py`: four hybrid transpilation cases marked xfail | 4 | W1-01 must prevent non-strict xfails from masking authentication failures and move real-service behavior to a separately authorized external suite or deterministic fixture. |
+
+Another 22 error-path tests across `tests/integration/test_qta.py` and
+`tests/integration/test_sync.py` are service-coupled false greens. Source call order resolves
+the backend before loading/validating the circuit, so a missing-credential error can satisfy
+their broad wrong-backend or wrong-QASM assertions before the intended behavior is exercised.
+With the CI token present, these cases can reach the real service. W1-01 must deterministically
+fake service resolution for all 38 service-coupled cases and tighten these 22 assertions to
+require the intended error source.
+
+Only the remaining 14 cases are genuinely mocked or local-validation-only. Running the four
+hybrid cases with `--runxfail` confirms they fail during credential-dependent `ibm_boston`
+backend resolution, before hybrid transpilation behavior is exercised.
+
+### Mocked tests that encode token/control-plane behavior
+
+| Surface | Existing evidence | Classification and remediation owner |
+|---|---|---|
+| Runtime unit/integration fixtures | `tests/conftest.py`, `tests/test_server.py`, `tests/test_integration.py`, and `tests/test_sync.py` patch environment tokens or call account setup/initialization with token arguments. They are mocked and do not need a real token. | W1-02 must replace assertions that preserve raw-token arguments, implicit credential persistence, destructive account deletion, token-suffix disclosure, and implicit instance selection with research/admin profile and redaction contracts. |
+| IBM Transpiler unit fixtures | `tests/conftest.py` and unit tests for the Runtime service provider, utilities, and sync wrappers use placeholder token arguments and assert persistence/caching behavior. They are mocked and do not need a real token. | W1-02 owns the token-free research surface and explicit credential ownership; retain only tests appropriate to an optional admin/internal boundary. |
+| FastMCP tool registration | Runtime account-management tool tests were weakened by the FastMCP 3 migration to callable-only checks. | W1-02 must add exact public `list_tools()` assertions for research/admin profiles, including negative token/setup/delete assertions. |
+| CI secret injection | `.github/workflows/test.yml` injects `QISKIT_IBM_TOKEN` into both Runtime and IBM Transpiler jobs. | W1-01 removes it from ordinary Runtime CI and splits Transpiler hermetic checks from an explicitly authorized external suite; W1-02 ensures the research profile never accepts a token argument. |
+
+Additional W1-01 work is to establish one canonical lock, add FastMCP/Primitive V2/QPY
+compatibility guards, correct the Python 3.14 matrix contradiction, pin uv, and repair the
+Docs integration client's event-loop lifecycle. Additional W1-02 coverage must include
+environment authentication without persistence, exception/log redaction, explicit instance
+ownership, and a network-denial fixture.
 
 ## Files changed
 
