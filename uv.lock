@@ -4500,7 +4500,7 @@ qpy-compat = [
 
 [[package]]
 name = "qiskit-docs-mcp-server"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "qiskit-docs-mcp-server" }
 dependencies = [
     { name = "beautifulsoup4" },
@@ -4600,7 +4600,7 @@ wheels = [
 
 [[package]]
 name = "qiskit-gym-mcp-server"
-version = "0.4.0"
+version = "0.4.1"
 source = { editable = "qiskit-gym-mcp-server" }
 dependencies = [
     { name = "fastmcp" },
@@ -4758,7 +4758,7 @@ wheels = [
 
 [[package]]
 name = "qiskit-ibm-runtime-mcp-server"
-version = "0.6.0"
+version = "0.6.1"
 source = { editable = "qiskit-ibm-runtime-mcp-server" }
 dependencies = [
     { name = "fastmcp" },
@@ -4881,7 +4881,7 @@ wheels = [
 
 [[package]]
 name = "qiskit-ibm-transpiler-mcp-server"
-version = "0.4.0"
+version = "0.4.1"
 source = { editable = "qiskit-ibm-transpiler-mcp-server" }
 dependencies = [
     { name = "fastmcp" },
@@ -4969,7 +4969,7 @@ test = [
 
 [[package]]
 name = "qiskit-mcp-server"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "qiskit-mcp-server" }
 dependencies = [
     { name = "fastmcp" },
@@ -5064,7 +5064,7 @@ test = [
 
 [[package]]
 name = "qiskit-mcp-servers"
-version = "0.11.0"
+version = "0.12.0"
 source = { editable = "." }
 dependencies = [
     { name = "qiskit-docs-mcp-server" },
