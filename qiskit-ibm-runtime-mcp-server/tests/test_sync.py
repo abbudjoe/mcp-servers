@@ -21,7 +21,6 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     active_instance_info,
     available_instances,
     cancel_job,
-    delete_saved_account,
     find_optimal_qubit_chains,
     find_optimal_qv_qubits,
     get_backend_calibration,
@@ -36,18 +35,12 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     list_saved_accounts,
     run_estimator,
     run_sampler,
-    setup_ibm_quantum_account,
     usage_info,
 )
 
 
 class TestWithSyncDecorator:
     """Test that async functions have .sync attribute."""
-
-    def test_setup_ibm_quantum_account_has_sync(self):
-        """Test setup_ibm_quantum_account has .sync attribute."""
-        assert hasattr(setup_ibm_quantum_account, "sync")
-        assert callable(setup_ibm_quantum_account.sync)
 
     def test_list_backends_has_sync(self):
         """Test list_backends has .sync attribute."""
@@ -98,11 +91,6 @@ class TestWithSyncDecorator:
         """Test find_optimal_qv_qubits has .sync attribute."""
         assert hasattr(find_optimal_qv_qubits, "sync")
         assert callable(find_optimal_qv_qubits.sync)
-
-    def test_delete_saved_account_has_sync(self):
-        """Test delete_saved_account has .sync attribute."""
-        assert hasattr(delete_saved_account, "sync")
-        assert callable(delete_saved_account.sync)
 
     def test_list_saved_accounts_has_sync(self):
         """Test list_saved_accounts has .sync attribute."""
@@ -304,23 +292,6 @@ class TestSyncMethodExecution:
 
             assert "connected" in result
 
-    def test_setup_ibm_quantum_account_sync_success(self):
-        """Test successful account setup with .sync method."""
-        mock_response = {
-            "status": "success",
-            "message": "IBM Quantum account set up successfully",
-            "channel": "ibm_quantum_platform",
-            "available_backends": 10,
-        }
-
-        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
-            mock_run.return_value = mock_response
-
-            result = setup_ibm_quantum_account.sync()
-
-            assert result["status"] == "success"
-            assert result["available_backends"] == 10
-
     def test_find_optimal_qubit_chains_sync_success(self):
         """Test successful qubit chain finding with .sync method."""
         mock_response = {
@@ -453,40 +424,6 @@ class TestSyncMethodExecution:
 
             assert result["status"] == "success"
             assert result["job_id"] == "job_789"
-
-    def test_delete_saved_account_sync_success(self):
-        """Test successful account deletion with .sync method."""
-        mock_response = {
-            "status": "success",
-            "deleted": True,
-            "message": "Account successfully deleted",
-        }
-
-        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
-            mock_run.return_value = mock_response
-
-            result = delete_saved_account.sync("test_account")
-
-            assert result["status"] == "success"
-            assert result["deleted"] is True
-            assert "successfully deleted" in result["message"]
-
-    def test_delete_saved_account_sync_error(self):
-        """Test error handling in delete_saved_account .sync method."""
-        mock_response = {
-            "status": "error",
-            "deleted": False,
-            "message": "Account name not found or could not be deleted",
-        }
-
-        with patch("qiskit_ibm_runtime_mcp_server.utils._run_async") as mock_run:
-            mock_run.return_value = mock_response
-
-            result = delete_saved_account.sync("nonexistent_account")
-
-            assert result["status"] == "error"
-            assert result["deleted"] is False
-            assert "not found" in result["message"]
 
     def test_list_saved_accounts_sync_success(self):
         """Test successful saved accounts listing with .sync method."""

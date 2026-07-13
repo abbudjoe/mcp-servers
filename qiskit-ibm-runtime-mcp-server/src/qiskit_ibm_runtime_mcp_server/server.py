@@ -37,7 +37,6 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     available_instances,
     cancel_job,
     DDSequenceType,
-    delete_saved_account,
     find_optimal_qubit_chains,
     find_optimal_qv_qubits,
     get_backend_calibration,
@@ -57,26 +56,30 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     QVScoringMetric,
     run_estimator,
     run_sampler,
-    setup_ibm_quantum_account,
     ScoringMetric,
     usage_info,
 )
+from qiskit_ibm_runtime_mcp_server.profiles import DEFAULT_TOOL_PROFILE
+from qiskit_ibm_runtime_mcp_server.security import install_secret_redaction
 
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
+install_secret_redaction(logging.getLogger())
 logger = logging.getLogger(__name__)
+install_secret_redaction(logger)
 
 # Initialize MCP server
 mcp = FastMCP(
     "Qiskit IBM Runtime",
     instructions="""\
-This server provides access to IBM Quantum hardware through Qiskit IBM Runtime.
+This is the default research profile for IBM Quantum access through Qiskit IBM Runtime.
 
 Getting started:
-1. Call setup_ibm_quantum_account_tool to authenticate (or it will attempt \
-to use QISKIT_IBM_TOKEN env var or saved credentials automatically).
-2. Use list_backends_tool to see available backends, or least_busy_backend_tool \
+1. Configure QISKIT_IBM_RUNTIME_MCP_INSTANCE explicitly.
+2. Authenticate with QISKIT_IBM_TOKEN or existing Qiskit saved credentials. \
+Credentials are never accepted by tools or persisted by this server.
+3. Use list_backends_tool to see available backends, or least_busy_backend_tool \
 to quickly find one with a short queue.
 
 Running circuits:
@@ -101,20 +104,10 @@ to check quota and consumption.\
 """,
 )
 
+tool_profile = DEFAULT_TOOL_PROFILE
+
 
 # Tools
-@mcp.tool()
-async def setup_ibm_quantum_account_tool(
-    token: str = "", channel: str = "ibm_quantum_platform"
-) -> dict[str, Any]:
-    """Set up IBM Quantum account with credentials.
-
-    If token is not provided, will attempt to use QISKIT_IBM_TOKEN environment variable
-    or saved credentials from ~/.qiskit/qiskit-ibm.json
-    """
-    return await setup_ibm_quantum_account(token if token else None, channel)
-
-
 @mcp.tool()
 async def list_backends_tool() -> dict[str, Any]:
     """List available IBM Quantum backends."""
@@ -456,27 +449,11 @@ async def run_estimator_tool(
 
 
 @mcp.tool()
-async def delete_saved_account_tool(account_name: str) -> dict[str, Any]:
-    """Delete a saved IBM Quantum account from disk.
-
-    WARNING: This permanently removes credentials from ~/.qiskit/qiskit-ibm.json.
-    The operation cannot be undone. Use list_saved_accounts_tool() first to verify
-    the account name before deletion.
-
-    Args:
-        account_name: Name of the saved account to delete (e.g., 'ibm_quantum_platform').
-                      Use list_saved_accounts_tool() to find available names.
-    """
-    return await delete_saved_account(account_name)
-
-
-@mcp.tool()
 async def list_saved_accounts_tool() -> dict[str, Any]:
     """List all IBM Quantum accounts saved on disk.
 
     Returns account information from ~/.qiskit/qiskit-ibm.json including account names
-    and channels. Useful for checking available accounts before initializing the service
-    or before deleting an account. Tokens are masked for security.
+    and channels. Secret-bearing fields are redacted from the result.
     """
     return await list_saved_accounts()
 
@@ -487,7 +464,7 @@ async def active_account_info_tool() -> dict[str, Any]:
 
     Returns details about the account being used in the current session, including
     channel, instance, and name. This is the account used for all quantum operations.
-    Tokens are masked for security.
+    Secret-bearing fields are redacted from the result.
     """
     return await active_account_info()
 

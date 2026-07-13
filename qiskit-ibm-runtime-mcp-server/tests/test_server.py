@@ -22,7 +22,6 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     active_instance_info,
     available_instances,
     cancel_job,
-    delete_saved_account,
     get_backend_calibration,
     get_backend_properties,
     get_bell_state_circuit,
@@ -33,7 +32,7 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     get_quantum_random_circuit,
     get_service_status,
     get_superposition_circuit,
-    get_token_from_env,
+    _get_token_from_env,
     initialize_service,
     least_busy_backend,
     list_backends,
@@ -41,7 +40,6 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     list_saved_accounts,
     run_estimator,
     run_sampler,
-    setup_ibm_quantum_account,
     usage_info,
 )
 from qiskit_ibm_runtime_mcp_server.server import mcp
@@ -49,7 +47,6 @@ from qiskit_ibm_runtime_mcp_server.server import (
     active_account_info_tool,
     active_instance_info_tool,
     available_instances_tool,
-    delete_saved_account_tool,
     list_saved_accounts_tool,
     usage_info_tool,
 )
@@ -61,25 +58,25 @@ class TestGetTokenFromEnv:
     def test_get_token_from_env_valid(self):
         """Test getting valid token from environment."""
         with patch.dict(os.environ, {"QISKIT_IBM_TOKEN": "valid_token_123"}):
-            token = get_token_from_env()
+            token = _get_token_from_env()
             assert token == "valid_token_123"
 
     def test_get_token_from_env_empty(self):
         """Test getting token when environment variable is not set."""
         with patch.dict(os.environ, {}, clear=True):
-            token = get_token_from_env()
+            token = _get_token_from_env()
             assert token is None
 
     def test_get_token_from_env_placeholder(self):
         """Test that placeholder tokens are rejected."""
         with patch.dict(os.environ, {"QISKIT_IBM_TOKEN": "<PASSWORD>"}):
-            token = get_token_from_env()
+            token = _get_token_from_env()
             assert token is None
 
     def test_get_token_from_env_whitespace(self):
         """Test that whitespace-only tokens return None."""
         with patch.dict(os.environ, {"QISKIT_IBM_TOKEN": "   "}):
-            token = get_token_from_env()
+            token = _get_token_from_env()
             assert token is None
 
 
@@ -116,239 +113,36 @@ class TestGetInstanceFromEnv:
 
 
 class TestInitializeService:
-    """Test service initialization function."""
+    """Test secure service initialization."""
 
-    def test_initialize_service_existing_account(self, mock_runtime_service):
-        """Test initialization with existing account."""
+    def test_initialize_service_uses_saved_credentials(self, mock_runtime_service):
+        """Saved credentials are used with the required configured instance."""
         with patch(
             "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService"
         ) as mock_qrs:
             mock_qrs.return_value = mock_runtime_service
 
-            service = initialize_service()
+            result = initialize_service()
 
-            assert service == mock_runtime_service
-            mock_qrs.assert_called_once_with(channel="ibm_quantum_platform")
-
-    def test_initialize_service_with_token(self, mock_runtime_service):
-        """Test initialization with provided token."""
-        with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService"
-        ) as mock_qrs:
-            mock_qrs.return_value = mock_runtime_service
-
-            service = initialize_service(
-                token="test_token", channel="ibm_quantum_platform"
+            assert result == mock_runtime_service
+            mock_qrs.assert_called_once_with(
+                channel="ibm_quantum_platform", instance="test-instance"
             )
-
-            assert service == mock_runtime_service
-            mock_qrs.save_account.assert_called_once_with(
-                channel="ibm_quantum_platform", token="test_token", overwrite=True
-            )
-
-    def test_initialize_service_with_env_token(
-        self, mock_runtime_service, mock_env_vars
-    ):
-        """Test initialization with environment token."""
-        with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService"
-        ) as mock_qrs:
-            mock_qrs.return_value = mock_runtime_service
-
-            service = initialize_service()
-
-            assert service == mock_runtime_service
-
-    def test_initialize_service_no_token_available(self):
-        """Test initialization failure when no token is available."""
-        with (
-            patch(
-                "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService"
-            ) as mock_qrs,
-            patch.dict(os.environ, {}, clear=True),
-        ):
-            mock_qrs.side_effect = Exception("No account")
-
-            with pytest.raises(ValueError) as exc_info:
-                initialize_service()
-
-            assert "No IBM Quantum token provided" in str(exc_info.value)
-
-    def test_initialize_service_invalid_token(self):
-        """Test initialization with invalid token."""
-        with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService"
-        ) as mock_qrs:
-            mock_qrs.side_effect = Exception("No account")
-            mock_qrs.save_account.side_effect = Exception("Invalid token")
-
-            with pytest.raises(ValueError) as exc_info:
-                initialize_service(token="invalid_token")
-
-            assert "Invalid token or channel" in str(exc_info.value)
-
-    def test_initialize_service_placeholder_token(self):
-        """Test that placeholder tokens are rejected."""
-        with pytest.raises(ValueError) as exc_info:
-            initialize_service(token="<PASSWORD>")
-
-        assert "appears to be a placeholder value" in str(exc_info.value)
-
-    def test_initialize_service_prioritizes_saved_credentials(
-        self, mock_runtime_service
-    ):
-        """Test that saved credentials are tried first when no token provided."""
-        with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService"
-        ) as mock_qrs:
-            mock_qrs.return_value = mock_runtime_service
-
-            service = initialize_service()
-
-            assert service == mock_runtime_service
-            # Should NOT call save_account
             mock_qrs.save_account.assert_not_called()
 
-    def test_initialize_service_with_instance_parameter(self, mock_runtime_service):
-        """Test initialization with explicit instance parameter."""
+    def test_initialize_service_with_explicit_instance(self, mock_runtime_service):
+        """An explicit Python argument overrides environment configuration."""
         with patch(
             "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService"
         ) as mock_qrs:
             mock_qrs.return_value = mock_runtime_service
 
-            service = initialize_service(instance="my-instance-crn")
+            result = initialize_service(instance="explicit-instance")
 
-            assert service == mock_runtime_service
+            assert result == mock_runtime_service
             mock_qrs.assert_called_once_with(
-                channel="ibm_quantum_platform", instance="my-instance-crn"
+                channel="ibm_quantum_platform", instance="explicit-instance"
             )
-
-    def test_initialize_service_with_instance_from_env(self, mock_runtime_service):
-        """Test initialization with instance from environment variable."""
-        with (
-            patch(
-                "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService"
-            ) as mock_qrs,
-            patch.dict(
-                os.environ, {"QISKIT_IBM_RUNTIME_MCP_INSTANCE": "env-instance-crn"}
-            ),
-        ):
-            mock_qrs.return_value = mock_runtime_service
-
-            service = initialize_service()
-
-            assert service == mock_runtime_service
-            mock_qrs.assert_called_once_with(
-                channel="ibm_quantum_platform", instance="env-instance-crn"
-            )
-
-    def test_initialize_service_explicit_instance_overrides_env(
-        self, mock_runtime_service
-    ):
-        """Test that explicit instance parameter overrides environment variable."""
-        with (
-            patch(
-                "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService"
-            ) as mock_qrs,
-            patch.dict(
-                os.environ, {"QISKIT_IBM_RUNTIME_MCP_INSTANCE": "env-instance-crn"}
-            ),
-        ):
-            mock_qrs.return_value = mock_runtime_service
-
-            service = initialize_service(instance="explicit-instance-crn")
-
-            assert service == mock_runtime_service
-            mock_qrs.assert_called_once_with(
-                channel="ibm_quantum_platform", instance="explicit-instance-crn"
-            )
-
-    def test_initialize_service_with_token_and_instance(self, mock_runtime_service):
-        """Test initialization with both token and instance."""
-        with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService"
-        ) as mock_qrs:
-            mock_qrs.return_value = mock_runtime_service
-
-            service = initialize_service(token="test_token", instance="my-instance-crn")
-
-            assert service == mock_runtime_service
-            mock_qrs.save_account.assert_called_once_with(
-                channel="ibm_quantum_platform", token="test_token", overwrite=True
-            )
-            mock_qrs.assert_called_with(
-                channel="ibm_quantum_platform", instance="my-instance-crn"
-            )
-
-
-class TestSetupIBMQuantumAccount:
-    """Test setup_ibm_quantum_account function."""
-
-    @pytest.mark.asyncio
-    async def test_setup_account_success(self, mock_runtime_service):
-        """Test successful account setup."""
-        with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
-        ) as mock_init:
-            mock_init.return_value = mock_runtime_service
-
-            result = await setup_ibm_quantum_account("test_token")
-
-            assert result["status"] == "success"
-            assert result["available_backends"] == 2
-            assert result["channel"] == "ibm_quantum_platform"
-            mock_init.assert_called_once_with("test_token", "ibm_quantum_platform")
-
-    @pytest.mark.asyncio
-    async def test_setup_account_empty_token_with_saved_credentials(
-        self, mock_runtime_service
-    ):
-        """Test setup with empty token falls back to saved credentials."""
-        with (
-            patch(
-                "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
-            ) as mock_init,
-            patch(
-                "qiskit_ibm_runtime_mcp_server.ibm_runtime.get_token_from_env"
-            ) as mock_env,
-        ):
-            mock_env.return_value = None  # No env token
-            mock_init.return_value = mock_runtime_service
-
-            result = await setup_ibm_quantum_account("")
-
-            assert result["status"] == "success"
-            # Should initialize with None to use saved credentials
-            mock_init.assert_called_once_with(None, "ibm_quantum_platform")
-
-    @pytest.mark.asyncio
-    async def test_setup_account_placeholder_token(self):
-        """Test setup with placeholder token is rejected."""
-        result = await setup_ibm_quantum_account("<PASSWORD>")
-
-        assert result["status"] == "error"
-        assert "appears to be a placeholder value" in result["message"]
-
-    @pytest.mark.asyncio
-    async def test_setup_account_invalid_channel(self):
-        """Test setup with invalid channel."""
-        result = await setup_ibm_quantum_account("test_token", "invalid_channel")
-
-        assert result["status"] == "error"
-        assert "Channel must be" in result["message"]
-
-    @pytest.mark.asyncio
-    async def test_setup_account_initialization_failure(self):
-        """Test setup when initialization fails."""
-        with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
-        ) as mock_init:
-            mock_init.side_effect = Exception("Authentication failed")
-
-            result = await setup_ibm_quantum_account("test_token")
-
-            assert result["status"] == "error"
-            assert "Failed to set up account" in result["message"]
 
 
 class TestListBackends:
@@ -2111,53 +1905,6 @@ measure q -> c;
             )
 
 
-class TestDeleteSavedAccount:
-    """Test delete_saved_account function."""
-
-    @pytest.mark.asyncio
-    async def test_delete_saved_account_success(self):
-        """Test successful account deletion."""
-        with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService.delete_account"
-        ) as mock_delete:
-            mock_delete.return_value = True
-
-            result = await delete_saved_account("test_account")
-
-            assert result["status"] == "success"
-            assert result["deleted"] is True
-            assert "successfully deleted" in result["message"]
-            mock_delete.assert_called_once_with(name="test_account")
-
-    @pytest.mark.asyncio
-    async def test_delete_saved_account_not_found(self):
-        """Test account deletion when account not found."""
-        with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService.delete_account"
-        ) as mock_delete:
-            mock_delete.return_value = False
-
-            result = await delete_saved_account("nonexistent_account")
-
-            assert result["status"] == "error"
-            assert result["deleted"] is False
-            assert "not found" in result["message"]
-
-    @pytest.mark.asyncio
-    async def test_delete_saved_account_exception(self):
-        """Test account deletion with exception."""
-        with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.QiskitRuntimeService.delete_account"
-        ) as mock_delete:
-            mock_delete.side_effect = Exception("Permission denied")
-
-            result = await delete_saved_account("test_account")
-
-            assert result["status"] == "error"
-            assert result["deleted"] is False
-            assert "Permission denied" in result["message"]
-
-
 class TestListSavedAccounts:
     """Test list_saved_accounts function."""
 
@@ -2186,9 +1933,9 @@ class TestListSavedAccounts:
 
             assert result["status"] == "success"
             assert "accounts" in result
-            # Verify tokens are masked (showing only last 4 characters)
-            assert result["accounts"]["ibm_quantum_platform"]["token"] == "***c123"
-            assert result["accounts"]["custom_account"]["token"] == "***z789"
+            # Secret-bearing fields are fully redacted; no suffix is disclosed.
+            assert result["accounts"]["ibm_quantum_platform"]["token"] == "[REDACTED]"
+            assert result["accounts"]["custom_account"]["token"] == "[REDACTED]"
             # Verify other fields are unchanged
             assert (
                 result["accounts"]["ibm_quantum_platform"]["channel"] == "ibm_quantum"
@@ -2249,8 +1996,7 @@ class TestActiveAccountInfo:
             assert "account_info" in result
             assert result["account_info"]["channel"] == "ibm_quantum"
             assert result["account_info"]["url"] == mock_account["url"]
-            # Verify token is masked (showing only last 4 characters)
-            assert result["account_info"]["token"] == "***_123"
+            assert result["account_info"]["token"] == "[REDACTED]"
 
     @pytest.mark.asyncio
     async def test_active_account_info_none_value(self, mock_runtime_service):
@@ -2477,11 +2223,6 @@ class TestUsageInfo:
 
 class TestAccountManagementToolsExist:
     """Test that MCP tool wrappers for account management are properly registered."""
-
-    def test_delete_saved_account_tool_exists(self):
-        """Test delete_saved_account_tool is registered as MCP tool."""
-        assert delete_saved_account_tool is not None
-        assert callable(delete_saved_account_tool)
 
     def test_list_saved_accounts_tool_exists(self):
         """Test list_saved_accounts_tool is registered as MCP tool."""
