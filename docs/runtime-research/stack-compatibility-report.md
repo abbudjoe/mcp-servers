@@ -85,7 +85,7 @@ control plane. Package builds do not include or need a lockfile.
 | `qiskit-mcp-servers` | Qiskit wrapper `>=0.3,<0.4`; Docs `>=0.2,<0.3`; Runtime `>=0.6,<0.7`; IBM Transpiler `>=0.4,<0.5`; optional Gym `>=0.4,<0.5`. |
 | `qiskit-mcp-server` | FastMCP `>=3.2,<3.5`; Qiskit `>=1.3,<2.6`; QASM3 Import `>=0.5,<0.7`; Pydantic `>=2`; python-dotenv `>=1`. |
 | `qiskit-docs-mcp-server` | Beautiful Soup `>=4.12`; defusedxml `>=0.7.1`; FastMCP `>=3.2,<3.5`; html2text `>=2020.1.16`; HTTPX `>=0.28.1`. |
-| `qiskit-ibm-runtime-mcp-server` | FastMCP `>=3.2,<3.5`; Runtime `>=0.40.1,<0.46`; Qiskit wrapper `>=0.3,<0.4`; Pydantic `>=2`; python-dotenv `>=1`. |
+| `qiskit-ibm-runtime-mcp-server` | FastMCP `>=3.2,<3.5`; NumPy `>=1.26`; Runtime `>=0.40.1,<0.46`; Qiskit wrapper `>=0.3,<0.4`; Pydantic `>=2`; python-dotenv `>=1`. |
 | `qiskit-ibm-transpiler-mcp-server` | FastMCP `>=3.2,<3.5`; Qiskit `>=2.1,<2.5`; IBM Transpiler `>=0.18,<0.19`; Qiskit wrapper `>=0.3,<0.4`. |
 | `qiskit-gym-mcp-server` | FastMCP `>=3.2,<3.5`; Qiskit Gym `>=0.4,<0.5`; Qiskit `>=2.1,<2.6`; Runtime `>=0.40.1,<0.46`; Qiskit wrapper `>=0.3,<0.4`; Pydantic `>=2`. |
 
@@ -114,7 +114,7 @@ compatibility inputs:
 | Root dev | mypy `>=1.18.2`; Ruff `>=0.14.6`. |
 | Root examples | deepagents `>=0.1` on Python 3.11+; LangChain `>=1.2`; MCP adapters `>=0.1`; Anthropic `>=1`; python-dotenv `>=1`. |
 | Core/Runtime dev | Ruff `>=0.11.13`; mypy `>=1.15`; pre-commit `>=3.5`; Bandit `>=1.7` in extras and `>=1.9.2` in the uv group. |
-| Core/Runtime tests | pytest `>=7.4`; pytest-asyncio `>=0.21`; pytest-mock `>=3.11`; pytest-cov `>=4.1`. |
+| Core/Runtime tests | JSON Schema `>=4`; pytest `>=7.4`; pytest-asyncio `>=0.21`; pytest-mock `>=3.11`; pytest-cov `>=4.1`. |
 | Docs dev/tests | Bandit `>=1.8.2`; mypy `>=1.15`; pre-commit `>=4.1`; Ruff `>=0.9.4`; types-defusedxml `>=0.7`; pytest family at the same lower bounds as Core. |
 | IBM Transpiler/Gym dev/tests | Ruff `>=0.11.13`; mypy `>=1.15`; Bandit `>=1.9.2`; pytest `>=8.4.2`; pytest-asyncio `>=1.2`; pytest-mock `>=3.15.1`; pytest-cov `>=4.1`. |
 | Member examples | LangChain/provider/adapters/python-dotenv lower bounds as recorded in each member `pyproject.toml`; these do not define the scientific Runtime API. |
@@ -223,8 +223,8 @@ services; local/unit coverage remains in the matrix. No CI guard submits a primi
 
 | Gate | Result |
 |---|---|
-| Root lock digest | `uv.lock` SHA-256 is `1bab4b2a6fbd0578c5212d0b7250dbe3d4350af10b16b747e0ef5ac362d536c6`; `shasum -a 256 -c uv.lock.sha256` passed. The uv lock also records the selected artifact hashes for every registry distribution. |
-| Clean regeneration | A repository copy excluding `.git`, `.venv`, and every `uv.lock` ran `uv lock --python 3.12.12`; it resolved 336 packages and the generated lock was byte-identical to the checked-in lock (`cmp` passed with the same SHA-256). |
+| Root lock digest | The original W1-01 lock SHA-256 was `1bab4b2a6fbd0578c5212d0b7250dbe3d4350af10b16b747e0ef5ac362d536c6`. W1-03 added direct Runtime-package ownership of its NumPy contract and JSON Schema test dependency; the regenerated `uv.lock` SHA-256 is `08d742daad084ae27e0a22c6b63e0597c0dbfd8fccff67fadea5344495df704e`, and `shasum -a 256 -c uv.lock.sha256` passes. The resolved versions and artifact hashes did not change. |
+| Clean regeneration | During W1-01, a repository copy excluding `.git`, `.venv`, and every `uv.lock` ran `uv lock --python 3.12.12`; it resolved 336 packages and the generated lock was byte-identical to that W1-01 lock. After W1-03 declared already-resolved NumPy and JSON Schema dependencies directly, `uv lock --check --python 3.12.12` and the updated digest check pass; no resolved package version or distribution artifact changed. |
 | Clean install | A new external virtual environment ran `uv sync --active --locked --python 3.12.12 --all-packages --all-groups` against the clean copy and installed 296 packages. It reported Qiskit 2.4.2, Runtime 0.45.1, FastMCP 3.4.4, IBM Transpiler 0.18.0, and Qiskit Gym 0.4.1. |
 | Publishability | `uv build --all-packages` produced wheel and sdist artifacts for all six workspace packages. Wheel metadata contains the documented ranges rather than workspace-only exact constraints. |
 | Canonical guards | The clean environment passed all 7 compatibility guards. |

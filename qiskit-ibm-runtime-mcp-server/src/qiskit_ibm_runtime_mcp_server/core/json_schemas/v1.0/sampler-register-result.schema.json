@@ -1,0 +1,147 @@
+{
+  "$defs": {
+    "ArtifactRef": {
+      "additionalProperties": true,
+      "description": "Portable reference to immutable content-addressed bytes.",
+      "properties": {
+        "artifact_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "kind": {
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "storage_uri": {
+          "minLength": 1,
+          "title": "Storage Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_id",
+        "kind",
+        "media_type",
+        "size_bytes",
+        "storage_uri"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    }
+  },
+  "$id": "https://qiskit.org/schemas/runtime-research/v1.0/sampler-register-result.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "One named classical register returned in a Sampler DataBin.",
+  "properties": {
+    "bitstrings_by_location": {
+      "anyOf": [
+        {
+          "items": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "array"
+        },
+        {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Bitstrings By Location"
+    },
+    "counts_by_location": {
+      "anyOf": [
+        {
+          "items": {
+            "additionalProperties": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Counts By Location"
+    },
+    "extensions": {
+      "additionalProperties": true,
+      "title": "Extensions",
+      "type": "object"
+    },
+    "num_bits": {
+      "exclusiveMinimum": 0,
+      "title": "Num Bits",
+      "type": "integer"
+    },
+    "num_shots": {
+      "exclusiveMinimum": 0,
+      "title": "Num Shots",
+      "type": "integer"
+    },
+    "pub_shape": {
+      "items": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Pub Shape",
+      "type": "array"
+    },
+    "register_name": {
+      "minLength": 1,
+      "title": "Register Name",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "register_name",
+    "pub_shape",
+    "num_shots",
+    "num_bits"
+  ],
+  "title": "SamplerRegisterResult",
+  "type": "object",
+  "x-schema-version": "1.0"
+}

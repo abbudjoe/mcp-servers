@@ -1,0 +1,32 @@
+{
+  "$defs": {
+    "JsonValue": {}
+  },
+  "$id": "https://qiskit.org/schemas/runtime-research/v1.0/inline-json-value.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "Explicit inline branch for values that may instead be artifact-backed.",
+  "properties": {
+    "kind": {
+      "const": "inline_json",
+      "title": "Kind",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "value": {
+      "$ref": "#/$defs/JsonValue"
+    }
+  },
+  "required": [
+    "schema_version",
+    "kind",
+    "value"
+  ],
+  "title": "InlineJsonValue",
+  "type": "object",
+  "x-schema-version": "1.0"
+}

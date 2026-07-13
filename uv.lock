@@ -4886,6 +4886,8 @@ version = "0.6.0"
 source = { editable = "qiskit-ibm-runtime-mcp-server" }
 dependencies = [
     { name = "fastmcp" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "qiskit-ibm-runtime" },
@@ -4895,6 +4897,7 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "bandit", extra = ["toml"] },
+    { name = "jsonschema" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -4915,6 +4918,7 @@ examples = [
     { name = "python-dotenv" },
 ]
 test = [
+    { name = "jsonschema" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -4934,6 +4938,7 @@ examples = [
     { name = "python-dotenv" },
 ]
 test = [
+    { name = "jsonschema" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -4944,9 +4949,11 @@ test = [
 requires-dist = [
     { name = "bandit", extras = ["toml"], marker = "extra == 'dev'", specifier = ">=1.7.0" },
     { name = "fastmcp", specifier = ">=3.2.0,<3.5" },
+    { name = "jsonschema", marker = "extra == 'test'", specifier = ">=4.0" },
     { name = "langchain", marker = "extra == 'examples'", specifier = ">=1.2.0" },
     { name = "langchain-mcp-adapters", marker = "extra == 'examples'", specifier = ">=0.1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.15.0" },
+    { name = "numpy", specifier = ">=1.26" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.5.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=7.4.0" },
@@ -4975,6 +4982,7 @@ examples = [
     { name = "python-dotenv", specifier = ">=1.0.0" },
 ]
 test = [
+    { name = "jsonschema", specifier = ">=4.0" },
     { name = "pytest", specifier = ">=7.4.0" },
     { name = "pytest-asyncio", specifier = ">=0.21.0" },
     { name = "pytest-cov", specifier = ">=4.1.0" },
