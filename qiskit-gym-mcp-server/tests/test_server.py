@@ -33,9 +33,10 @@ class TestServerRegistration:
         assert "synthesize_permutation_tool" in mcp.instructions
         assert "qiskit-gym://" in mcp.instructions
 
-    def test_resources_registered(self):
+    async def test_resources_registered(self):
         """Test that all expected static resources are registered."""
-        resource_uris = set(mcp._resource_manager._resources.keys())
+        resources = await mcp.list_resources()
+        resource_uris = {str(r.uri) for r in resources}
         expected_resources = {
             "qiskit-gym://presets/coupling-maps",
             "qiskit-gym://algorithms",
@@ -50,13 +51,15 @@ class TestServerRegistration:
             f"Missing resources: {expected_resources - resource_uris}"
         )
 
-    def test_resource_count(self):
+    async def test_resource_count(self):
         """Test the expected number of static resources."""
-        assert len(mcp._resource_manager._resources) == 8
+        resources = await mcp.list_resources()
+        assert len(resources) == 8
 
-    def test_prompts_registered(self):
+    async def test_prompts_registered(self):
         """Test that all expected prompts are registered."""
-        prompt_names = set(mcp._prompt_manager._prompts.keys())
+        prompts = await mcp.list_prompts()
+        prompt_names = {p.name for p in prompts}
         expected_prompts = {
             "train_synthesis_model",
             "synthesize_circuit",
@@ -66,13 +69,15 @@ class TestServerRegistration:
             f"Missing prompts: {expected_prompts - prompt_names}"
         )
 
-    def test_prompt_count(self):
+    async def test_prompt_count(self):
         """Test the expected number of prompts."""
-        assert len(mcp._prompt_manager._prompts) == 3
+        prompts = await mcp.list_prompts()
+        assert len(prompts) == 3
 
-    def test_resource_templates_registered(self):
+    async def test_resource_templates_registered(self):
         """Test that all expected resource templates are registered."""
-        template_uris = set(mcp._resource_manager._templates.keys())
+        templates = await mcp.list_resource_templates()
+        template_uris = {str(t.uri_template) for t in templates}
         expected_templates = {
             "qiskit-gym://environments/{env_id}",
             "qiskit-gym://models/{model_name}",
@@ -82,6 +87,7 @@ class TestServerRegistration:
             f"Missing resource templates: {expected_templates - template_uris}"
         )
 
-    def test_resource_template_count(self):
+    async def test_resource_template_count(self):
         """Test the expected number of resource templates."""
-        assert len(mcp._resource_manager._templates) == 3
+        templates = await mcp.list_resource_templates()
+        assert len(templates) == 3

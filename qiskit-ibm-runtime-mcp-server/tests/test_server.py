@@ -2481,32 +2481,32 @@ class TestAccountManagementToolsExist:
     def test_delete_saved_account_tool_exists(self):
         """Test delete_saved_account_tool is registered as MCP tool."""
         assert delete_saved_account_tool is not None
-        assert hasattr(delete_saved_account_tool, "name")
+        assert callable(delete_saved_account_tool)
 
     def test_list_saved_accounts_tool_exists(self):
         """Test list_saved_accounts_tool is registered as MCP tool."""
         assert list_saved_accounts_tool is not None
-        assert hasattr(list_saved_accounts_tool, "name")
+        assert callable(list_saved_accounts_tool)
 
     def test_active_account_info_tool_exists(self):
         """Test active_account_info_tool is registered as MCP tool."""
         assert active_account_info_tool is not None
-        assert hasattr(active_account_info_tool, "name")
+        assert callable(active_account_info_tool)
 
     def test_active_instance_info_tool_exists(self):
         """Test active_instance_info_tool is registered as MCP tool."""
         assert active_instance_info_tool is not None
-        assert hasattr(active_instance_info_tool, "name")
+        assert callable(active_instance_info_tool)
 
     def test_available_instances_tool_exists(self):
         """Test available_instances_tool is registered as MCP tool."""
         assert available_instances_tool is not None
-        assert hasattr(available_instances_tool, "name")
+        assert callable(available_instances_tool)
 
     def test_usage_info_tool_exists(self):
         """Test usage_info_tool is registered as MCP tool."""
         assert usage_info_tool is not None
-        assert hasattr(usage_info_tool, "name")
+        assert callable(usage_info_tool)
 
 
 class TestExampleCircuits:
@@ -2635,9 +2635,10 @@ class TestServerRegistration:
         """Test the server name is correct."""
         assert mcp.name == "Qiskit IBM Runtime"
 
-    def test_resources_registered(self):
+    async def test_resources_registered(self):
         """Test that all expected static resources are registered."""
-        resource_uris = set(mcp._resource_manager._resources.keys())
+        resources = await mcp.list_resources()
+        resource_uris = {str(r.uri) for r in resources}
         expected_resources = {
             "ibm://status",
             "circuits://bell-state",
@@ -2649,25 +2650,29 @@ class TestServerRegistration:
             f"Missing resources: {expected_resources - resource_uris}"
         )
 
-    def test_resource_count(self):
+    async def test_resource_count(self):
         """Test the expected number of static resources."""
-        assert len(mcp._resource_manager._resources) == 5
+        resources = await mcp.list_resources()
+        assert len(resources) == 5
 
-    def test_prompts_registered(self):
+    async def test_prompts_registered(self):
         """Test that all expected prompts are registered."""
-        prompt_names = set(mcp._prompt_manager._prompts.keys())
+        prompts = await mcp.list_prompts()
+        prompt_names = {p.name for p in prompts}
         expected_prompts = {"run_bell_state", "explore_backend", "monitor_job"}
         assert expected_prompts.issubset(prompt_names), (
             f"Missing prompts: {expected_prompts - prompt_names}"
         )
 
-    def test_prompt_count(self):
+    async def test_prompt_count(self):
         """Test the expected number of prompts."""
-        assert len(mcp._prompt_manager._prompts) == 3
+        prompts = await mcp.list_prompts()
+        assert len(prompts) == 3
 
-    def test_resource_templates_registered(self):
+    async def test_resource_templates_registered(self):
         """Test that all expected resource templates are registered."""
-        template_uris = set(mcp._resource_manager._templates.keys())
+        templates = await mcp.list_resource_templates()
+        template_uris = {str(t.uri_template) for t in templates}
         expected_templates = {
             "ibm://backends/{backend_name}",
             "ibm://jobs/{job_id}",
@@ -2676,9 +2681,10 @@ class TestServerRegistration:
             f"Missing resource templates: {expected_templates - template_uris}"
         )
 
-    def test_resource_template_count(self):
+    async def test_resource_template_count(self):
         """Test the expected number of resource templates."""
-        assert len(mcp._resource_manager._templates) == 2
+        templates = await mcp.list_resource_templates()
+        assert len(templates) == 2
 
 
 # Assisted by watsonx Code Assistant

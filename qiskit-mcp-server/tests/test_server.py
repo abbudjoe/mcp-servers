@@ -33,9 +33,10 @@ class TestServerRegistration:
         assert "load_circuit_from_qasm_tool" in mcp.instructions
         assert "qiskit://transpiler/" in mcp.instructions
 
-    def test_tools_registered(self):
+    async def test_tools_registered(self):
         """Test that all expected tools are registered."""
-        tool_names = {tool.name for tool in mcp._tool_manager._tools.values()}
+        tools = await mcp.list_tools()
+        tool_names = {t.name for t in tools}
         expected_tools = {
             "transpile_circuit_tool",
             "analyze_circuit_tool",
@@ -47,13 +48,15 @@ class TestServerRegistration:
         }
         assert expected_tools.issubset(tool_names), f"Missing tools: {expected_tools - tool_names}"
 
-    def test_tool_count(self):
+    async def test_tool_count(self):
         """Test the expected number of tools."""
-        assert len(mcp._tool_manager._tools) == 7
+        tools = await mcp.list_tools()
+        assert len(tools) == 7
 
-    def test_resources_registered(self):
+    async def test_resources_registered(self):
         """Test that all expected resources are registered."""
-        resource_uris = set(mcp._resource_manager._resources.keys())
+        resources = await mcp.list_resources()
+        resource_uris = {str(r.uri) for r in resources}
         expected_resources = {
             "qiskit://transpiler/info",
             "qiskit://transpiler/basis-gates",
@@ -63,13 +66,15 @@ class TestServerRegistration:
             f"Missing resources: {expected_resources - resource_uris}"
         )
 
-    def test_resource_count(self):
+    async def test_resource_count(self):
         """Test the expected number of resources."""
-        assert len(mcp._resource_manager._resources) == 3
+        resources = await mcp.list_resources()
+        assert len(resources) == 3
 
-    def test_prompts_registered(self):
+    async def test_prompts_registered(self):
         """Test that all expected prompts are registered."""
-        prompt_names = set(mcp._prompt_manager._prompts.keys())
+        prompts = await mcp.list_prompts()
+        prompt_names = {p.name for p in prompts}
         expected_prompts = {
             "transpile_for_hardware",
             "analyze_and_transpile",
@@ -79,6 +84,7 @@ class TestServerRegistration:
             f"Missing prompts: {expected_prompts - prompt_names}"
         )
 
-    def test_prompt_count(self):
+    async def test_prompt_count(self):
         """Test the expected number of prompts."""
-        assert len(mcp._prompt_manager._prompts) == 3
+        prompts = await mcp.list_prompts()
+        assert len(prompts) == 3
