@@ -324,28 +324,68 @@ def _normalize_result_url(url_val: Any, base: str) -> Any:
 
 
 def _build_result_entry(item: dict[str, Any], query: str, detail: str, base: str) -> dict[str, Any]:
-    """Build a single search-result entry with a snippet (or full text)."""
-    entry: dict[str, Any] = {
-        key: item[key] for key in _RESULT_META_FIELDS if item.get(key) is not None
-    }
+    """Build a single search-result entry.
+
+    In ``snippet`` mode (default) the entry is trimmed to a small set of
+    navigation fields plus a short ``snippet`` — token-economical for agent use.
+    In ``full`` mode the original upstream fields are preserved (backwards
+    compatible with the pre-snippet response) and the full page body is returned
+    as ``text``. Either way the upstream ``item`` is not mutated (dict/comprehension
+    copies), so cached search responses stay intact.
+    """
+    if detail == "full":
+        # Preserve all upstream fields for backwards compatibility.
+        entry: dict[str, Any] = dict(item)
+        raw_text = item.get("text")
+        if isinstance(raw_text, str):
+            entry["text"] = _strip_html_tags(raw_text)
+    else:
+        entry = {key: item[key] for key in _RESULT_META_FIELDS if item.get(key) is not None}
+        raw_text = item.get("text")
+        clean_text = _strip_html_tags(raw_text) if isinstance(raw_text, str) else ""
+        entry["snippet"] = _make_snippet(clean_text, query)
+
     if isinstance(entry.get("title"), str):
         entry["title"] = _strip_html_tags(entry["title"])
     if "url" in entry:
         entry["url"] = _normalize_result_url(entry["url"], base)
-
-    raw_text = item.get("text")
-    clean_text = _strip_html_tags(raw_text) if isinstance(raw_text, str) else ""
-    if detail == "full":
-        entry["text"] = clean_text
-    else:
-        entry["snippet"] = _make_snippet(clean_text, query)
     return entry
+
+
+def _resolve_effective_top_k(top_k: int | None, detail: str, total_results: int) -> int:
+    """Resolve how many results to return.
+
+    A ``None`` or non-positive ``top_k`` means "no explicit limit":
+
+    * In ``snippet`` mode (token-economical default) it falls back to
+      ``DEFAULT_SEARCH_TOP_K``.
+    * In ``full`` mode (the backwards-compatible option for issue #218) it
+      returns the *complete* result set, matching the pre-snippet behavior of
+      returning every match with full text.
+
+    An explicit positive ``top_k`` is honored. In ``snippet`` mode it is clamped
+    to ``[1, MAX_SEARCH_TOP_K]`` so a single agent-loop call can't balloon; in
+    ``full`` mode it is only floored at 1 (never clamped to the max), since full
+    is an opt-in heavy path where the caller has asked for everything.
+    """
+    if top_k is None or top_k <= 0:
+        # No explicit limit: full mode returns everything, snippet mode falls
+        # back to the default (still clamped below).
+        if detail == "full":
+            return total_results
+        top_k = DEFAULT_SEARCH_TOP_K
+    # top_k is now a positive int. Full mode honors it as-is; snippet mode
+    # clamps to [1, MAX_SEARCH_TOP_K]. The final max(1, ...) keeps the slice
+    # valid even if MAX_SEARCH_TOP_K were misconfigured below 1.
+    if detail == "full":
+        return top_k
+    return max(1, min(top_k, MAX_SEARCH_TOP_K))
 
 
 async def search_qiskit_docs(
     query: str,
     scope: str = "all",
-    top_k: int = DEFAULT_SEARCH_TOP_K,
+    top_k: int | None = None,
     detail: str = "snippet",
 ) -> dict[str, Any]:
     """Search Qiskit documentation for relevant results.
@@ -358,11 +398,17 @@ async def search_qiskit_docs(
         query: Search query string
         scope: Search scope filter. Valid values (case-sensitive):
             'all', 'documentation', 'api', 'learning', 'tutorials'
-        top_k: Maximum number of results to return (clamped to
-            [1, MAX_SEARCH_TOP_K]). Defaults to DEFAULT_SEARCH_TOP_K.
-        detail: 'snippet' (default) returns a short excerpt per result;
-            'full' returns each result's full page body (heavier — prefer
-            get_page for full content).
+        top_k: Maximum number of results to return. When None or non-positive
+            (the default), snippet mode falls back to DEFAULT_SEARCH_TOP_K and
+            full mode returns every match. An explicit value is clamped to
+            [1, MAX_SEARCH_TOP_K] in snippet mode and only floored at 1 in
+            full mode.
+        detail: 'snippet' (default) returns a short excerpt per result, a
+            trimmed field set, and at most DEFAULT_SEARCH_TOP_K/top_k results;
+            'full' restores the pre-snippet behavior — every match by default,
+            each with its full page body as 'text' and all original upstream
+            fields (backwards compatible, heavier, so prefer get_page for a
+            single page's full content).
 
     Returns:
         Search results with matching entries, counts, and metadata.
@@ -393,12 +439,6 @@ async def search_qiskit_docs(
             ),
         }
 
-    # Clamp top_k: non-positive falls back to the default, and an upper bound
-    # guards against a single call ballooning the response. The final max(1, ...)
-    # keeps the slice valid even if MAX_SEARCH_TOP_K were misconfigured low.
-    effective_top_k = top_k if top_k > 0 else DEFAULT_SEARCH_TOP_K
-    effective_top_k = max(1, min(effective_top_k, MAX_SEARCH_TOP_K))
-
     url = f"{BASE_URL}{SEARCH_PATH}?query={quote(query)}&module={quote(scope)}"
     logger.info("Searching docs for '%s' in scope '%s'", query, scope)
 
@@ -418,6 +458,7 @@ async def search_qiskit_docs(
     # `returned_results` is the (possibly smaller) count actually included here.
     total_results = len(results)
     base = QISKIT_DOCS_BASE.rstrip("/")
+    effective_top_k = _resolve_effective_top_k(top_k, detail, total_results)
     selected = results[:effective_top_k]
     cleaned = [_build_result_entry(item, query, detail, base) for item in selected]
     truncated = total_results > len(cleaned)

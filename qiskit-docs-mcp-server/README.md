@@ -225,9 +225,13 @@ print(page["documentation"])
 > **snippets** by default and caps results to `top_k` (default 5). In default
 > (`detail="snippet"`) mode each result carries a `snippet` field — not the full
 > `text` body — and is limited to `id, url, title, pageTitle, module, section,
-> snippet`. For full content, pass `detail="full"` or fetch the page with
-> `get_page_tool`. `total_results` is the grand total of matches; `returned_results`
-> is the count after the `top_k` cap.
+> snippet`. For the original behavior, pass `detail="full"`: it restores each
+> result's full `text` body and all upstream fields **and** returns every match
+> by default (no `top_k` cap) — an explicit `top_k` still limits the count in
+> full mode but is not clamped to the snippet-mode ceiling. Prefer `get_page_tool`
+> for a single page's full content. `total_results` is the grand total of matches;
+> `returned_results` is the count actually returned (equal to `total_results` in
+> full mode unless you set an explicit `top_k`).
 
 ### Fetch a Documentation Page
 
