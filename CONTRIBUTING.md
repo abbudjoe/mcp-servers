@@ -157,7 +157,8 @@ git commit -m "fix: description of bug that was fixed"
 - Tools are defined with `@mcp.tool()` decorator
 - Resources are defined with `@mcp.resource()` decorator
 - Async functions for all MCP handlers
-- Use `nest_asyncio` when synchronous wrappers are needed for DSPy/Jupyter compatibility
+- Synchronous wrappers must own their event loop and reject calls from an active loop
+- Async and Jupyter callers must use `await`; never apply a process-wide event-loop monkeypatch
 
 ### Error Handling
 

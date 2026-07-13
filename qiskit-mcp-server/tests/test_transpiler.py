@@ -353,6 +353,12 @@ class TestSyncInterface:
         assert result["status"] == "success"
         assert "basis_gate_sets" in result
 
+    @pytest.mark.asyncio
+    async def test_sync_rejects_an_active_event_loop(self) -> None:
+        """The sync boundary must not mutate or nest an owned event loop."""
+        with pytest.raises(RuntimeError, match="await the asynchronous function"):
+            get_available_basis_gates.sync()
+
 
 class TestCircuitFormat:
     """Tests for circuit format support (QASM3, QPY, QASM2 fallback)."""

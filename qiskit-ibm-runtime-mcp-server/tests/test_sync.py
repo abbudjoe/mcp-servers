@@ -14,6 +14,8 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     active_account_info,
     active_instance_info,
@@ -146,6 +148,12 @@ class TestWithSyncDecorator:
         """Test run_sampler has .sync attribute."""
         assert hasattr(run_sampler, "sync")
         assert callable(run_sampler.sync)
+
+    @pytest.mark.asyncio
+    async def test_sync_rejects_an_active_event_loop(self):
+        """The sync boundary must not mutate or nest an owned event loop."""
+        with pytest.raises(RuntimeError, match="await the asynchronous function"):
+            list_backends.sync()
 
 
 class TestSyncMethodExecution:

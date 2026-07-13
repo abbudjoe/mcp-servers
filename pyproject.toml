@@ -3,7 +3,7 @@ name = "qiskit-mcp-servers"
 version = "0.11.0"
 description = "Model Context Protocol servers for IBM Quantum services and Qiskit"
 readme = "README.md"
-requires-python = ">=3.10,<3.15"
+requires-python = ">=3.10,<3.14"
 license = {text = "Apache-2.0"}
 authors = [
     {name = "Quantum+AI Team. IBM Quantum", email = "Quantum.Plus.AI@ibm.com"}
@@ -18,39 +18,36 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
 # Meta-package dependencies: installs all MCP servers
 dependencies = [
-    "qiskit-mcp-server>=0.2.0",
-    "qiskit-docs-mcp-server>=0.1.1",
-    "qiskit-ibm-runtime-mcp-server>=0.5.0",
-    "qiskit-ibm-transpiler-mcp-server>=0.3.1",
+    "qiskit-mcp-server>=0.3.0,<0.4",
+    "qiskit-docs-mcp-server>=0.2.0,<0.3",
+    "qiskit-ibm-runtime-mcp-server>=0.6.0,<0.7",
+    "qiskit-ibm-transpiler-mcp-server>=0.4.0,<0.5",
 ]
 
 [project.optional-dependencies]
 # Install individual servers
-qiskit = ["qiskit-mcp-server>=0.2.0"]
-docs = ["qiskit-docs-mcp-server>=0.1.1"]
-runtime = ["qiskit-ibm-runtime-mcp-server>=0.5.0"]
-transpiler = ["qiskit-ibm-transpiler-mcp-server>=0.3.1"]
-gym = ["qiskit-gym-mcp-server>=0.3.0"]
+qiskit = ["qiskit-mcp-server>=0.3.0,<0.4"]
+docs = ["qiskit-docs-mcp-server>=0.2.0,<0.3"]
+runtime = ["qiskit-ibm-runtime-mcp-server>=0.6.0,<0.7"]
+transpiler = ["qiskit-ibm-transpiler-mcp-server>=0.4.0,<0.5"]
+gym = ["qiskit-gym-mcp-server>=0.4.0,<0.5"]
 # Install all servers (core + community)
 all = [
-    "qiskit-mcp-server>=0.2.0",
-    "qiskit-docs-mcp-server>=0.1.1",
-    "qiskit-ibm-runtime-mcp-server>=0.5.0",
-    "qiskit-ibm-transpiler-mcp-server>=0.3.1",
-    "qiskit-gym-mcp-server>=0.3.0",
+    "qiskit-mcp-server>=0.3.0,<0.4",
+    "qiskit-docs-mcp-server>=0.2.0,<0.3",
+    "qiskit-ibm-runtime-mcp-server>=0.6.0,<0.7",
+    "qiskit-ibm-transpiler-mcp-server>=0.4.0,<0.5",
+    "qiskit-gym-mcp-server>=0.4.0,<0.5",
 ]
 
 # Community servers
-community = [
-    "qiskit-gym-mcp-server>=0.3.0",
-]
+community = ["qiskit-gym-mcp-server>=0.4.0,<0.5"]
 
 [project.urls]
 Homepage = "https://github.com/Qiskit/mcp-servers"
@@ -73,6 +70,21 @@ members = [
     "qiskit-ibm-transpiler-mcp-server",
     "qiskit-gym-mcp-server",
     "qiskit-docs-mcp-server",
+]
+
+# The single scientific reference environment. These constraints affect only
+# workspace locking; published packages retain the compatible ranges above.
+[tool.uv]
+constraint-dependencies = [
+    "fastmcp==3.4.4",
+    "numpy==2.2.6; python_version < '3.11'",
+    "numpy==2.4.6; python_version >= '3.11'",
+    "qiskit==2.4.2",
+    "qiskit-gym==0.4.1",
+    "qiskit-ibm-runtime==0.45.1",
+    "qiskit-ibm-transpiler==0.18.0",
+    "qiskit-qasm3-import==0.6.0",
+    "qiskit-serverless==0.30.1",
 ]
 
 # Source configuration for workspace dependencies

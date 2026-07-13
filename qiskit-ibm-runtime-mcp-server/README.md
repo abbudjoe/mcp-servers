@@ -148,7 +148,7 @@ cancelled_job = await cancel_job("job_id")
 print(f"Cancelled job: {cancelled_job}")
 ```
 
-#### Sync Usage (Scripts, Jupyter)
+#### Sync Usage (Scripts and synchronous frameworks)
 
 For frameworks that don't support async operations, all async functions have a `.sync` attribute:
 
@@ -190,7 +190,7 @@ print(f"Best chain: {chains['chains'][0]['qubits']}")
 qv_qubits = find_optimal_qv_qubits.sync(backend['backend_name'], num_qubits=5)
 print(f"Best QV subgraph: {qv_qubits['subgraphs'][0]['qubits']}")
 
-# Works in Jupyter notebooks (handles nested event loops automatically)
+# In Jupyter or another active event loop, use: jobs = await list_my_jobs(limit=5)
 jobs = list_my_jobs.sync(limit=5)
 print(f"Recent jobs: {len(jobs['jobs'])}")
 ```
@@ -652,4 +652,3 @@ The test suite covers:
 - ✅ Error handling and input validation
 - ✅ Integration scenarios
 - ✅ Resource and tool handlers
-

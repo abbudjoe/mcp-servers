@@ -52,7 +52,7 @@ def extract_main_content(html: str) -> str:
 
     # Remove ARIA-role navigation elements
     for role in ["navigation", "banner", "contentinfo", "complementary"]:
-        for element in soup.find_all(attrs={"role": role}):
+        for element in soup.find_all(None, attrs={"role": role}):
             element.decompose()
 
     # Remove skip-to-content links
@@ -60,7 +60,7 @@ def extract_main_content(html: str) -> str:
         element.decompose()
     for element in soup.find_all(
         "a",
-        string=lambda s: s and "skip to" in s.lower(),  # type: ignore[call-overload]
+        string=lambda s: s and "skip to" in s.lower(),
     ):
         element.decompose()
 
@@ -73,7 +73,7 @@ def extract_main_content(html: str) -> str:
     if article:
         return str(article)
 
-    main_role = soup.find(attrs={"role": "main"})
+    main_role = soup.find(None, attrs={"role": "main"})
     if main_role:
         return str(main_role)
 
