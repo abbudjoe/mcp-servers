@@ -26,6 +26,7 @@ Dependencies:
 """
 
 import logging
+from datetime import datetime
 from typing import Any
 
 from fastmcp import FastMCP
@@ -41,6 +42,7 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     find_optimal_qv_qubits,
     get_backend_calibration,
     get_backend_properties,
+    get_backend_snapshot,
     get_bell_state_circuit,
     get_coupling_map,
     get_ghz_state_circuit,
@@ -59,6 +61,7 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     ScoringMetric,
     usage_info,
 )
+from qiskit_ibm_runtime_mcp_server.core.snapshots import FractionalGateMode
 from qiskit_ibm_runtime_mcp_server.profiles import DEFAULT_TOOL_PROFILE
 from qiskit_ibm_runtime_mcp_server.security import install_secret_redaction
 
@@ -150,6 +153,47 @@ async def get_backend_properties_tool(backend_name: str) -> dict[str, Any]:
 
 
 @mcp.tool()
+async def get_backend_snapshot_tool(
+    backend_name: str,
+    properties_at: datetime | None = None,
+    fractional_gate_mode: FractionalGateMode = "disabled",
+    dynamic_circuits: bool = False,
+    pec: bool = False,
+    pea: bool = False,
+    gate_twirling: bool = False,
+) -> dict[str, Any]:
+    """Get a complete current or historical backend metadata snapshot.
+
+    Args:
+        backend_name: Explicit IBM backend name. No backend is selected implicitly.
+        properties_at: Optional timezone-aware historical calibration timestamp.
+        fractional_gate_mode: ``disabled`` for control flow, ``enabled`` for
+            fractional gates, or ``all`` to inspect both target surfaces.
+        dynamic_circuits: Whether the intended workload requires dynamic circuits.
+        pec: Whether the intended workload enables probabilistic error cancellation.
+        pea: Whether the intended workload enables probabilistic error amplification.
+        gate_twirling: Whether the intended workload enables gate twirling.
+
+    Returns:
+        A versioned snapshot containing every target instruction/qargs tuple,
+        every physical qubit, calibrations, faults, provenance, and stable hashes.
+
+    Note:
+        This tool is metadata-only. Fractional mode ``enabled`` is rejected with
+        dynamic circuits, PEC, PEA, or gate twirling.
+    """
+    return await get_backend_snapshot(
+        backend_name=backend_name,
+        properties_at=properties_at,
+        fractional_gate_mode=fractional_gate_mode,
+        dynamic_circuits=dynamic_circuits,
+        pec=pec,
+        pea=pea,
+        gate_twirling=gate_twirling,
+    )
+
+
+@mcp.tool()
 async def get_backend_calibration_tool(
     backend_name: str, qubit_indices: list[int] | None = None
 ) -> dict[str, Any]:
@@ -158,7 +202,7 @@ async def get_backend_calibration_tool(
     Args:
         backend_name: Name of the backend (e.g., 'ibm_brisbane')
         qubit_indices: Optional list of specific qubit indices to get data for.
-                      If not provided, returns data for the first 10 qubits.
+                      If not provided, returns data for every backend qubit.
 
     Returns:
         Calibration data including:

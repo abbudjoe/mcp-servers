@@ -163,13 +163,61 @@ def _public_instances() -> list[object]:
             instance_id="crn:test",
             retrieved_at=NOW,
             properties_at=None,
+            properties_last_update=NOW,
+            properties_available=True,
+            fractional_gate_mode="disabled",
+            backend_version="1.2.3",
+            processor={
+                "family": "Heron",
+                "revision": "2",
+                "segment": "A",
+                "raw": {"family": "Heron", "revision": 2, "segment": "A"},
+            },
+            backend_status={
+                "operational": True,
+                "pending_jobs": 0,
+                "status_message": "active",
+            },
+            target={
+                "num_qubits": 2,
+                "physical_qubits": [0, 1],
+                "operation_names": ["x"],
+                "global_operations": [],
+                "dt": 5e-10,
+                "granularity": 1,
+                "min_length": 1,
+                "pulse_alignment": 1,
+                "acquire_alignment": 1,
+                "concurrent_measurements": None,
+            },
             target_hash=HASH_A,
             snapshot_hash=HASH_B,
-            qubits=[{"index": 0, "t1": np.float64(10.5)}],
-            instructions=[{"name": "x", "qubits": [0]}],
+            qubits=[
+                {
+                    "index": 0,
+                    "operational": True,
+                    "parameters": [
+                        {"name": "T1", "value": np.float64(10.5), "unit": "us"}
+                    ],
+                },
+                {"index": 1, "operational": True, "parameters": []},
+            ],
+            instructions=[
+                {
+                    "name": "x",
+                    "qubits": [0],
+                    "error": 0.001,
+                    "duration": 6e-8,
+                    "operational": True,
+                    "operation_parameters": [],
+                    "calibration_parameters": [],
+                }
+            ],
             coupling_edges=[[0, 1]],
             faulty_qubits=[],
             faulty_instructions=[],
+            general_parameters=[],
+            general_qlists=[],
             software_versions={"qiskit": "2.4.2"},
         ),
         PauliObservables(
