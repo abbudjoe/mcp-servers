@@ -603,6 +603,21 @@ def test_submission_returns_immutable_complete_receipt_and_enforced_tags(
         for options in primitive_factory.options
     )
     assert all(
+        all(len(tag) <= 86 for tag in options["environment"]["job_tags"])
+        for options in primitive_factory.options
+    )
+    assert all(
+        len(
+            next(
+                tag
+                for tag in options["environment"]["job_tags"]
+                if tag.startswith("qiskit-mcp-idempotency:")
+            )
+        )
+        == 86
+        for options in primitive_factory.options
+    )
+    assert all(
         "caller-tag" in options["environment"]["job_tags"]
         for options in primitive_factory.options
     )
@@ -610,6 +625,30 @@ def test_submission_returns_immutable_complete_receipt_and_enforced_tags(
         receipt.state = "failed"  # type: ignore[misc]
     with pytest.raises(ValidationError, match="frozen"):
         receipt.jobs[0].job_id = "changed"  # type: ignore[misc]
+
+
+def test_submission_rejects_oversized_caller_job_tag_before_primitive_run(
+    tmp_path: Path,
+) -> None:
+    lifecycle, _, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
+    limits = _limits()
+    plan = _plan(sink, limits)
+    plan.resolved_options["environment"] = {"job_tags": ["x" * 87]}
+    lifecycle.create_batch("ibm_test", limits)
+
+    receipt = lifecycle._submit_resolved_plan(
+        "batch-1",
+        plan,
+        submission_key="oversized-caller-tag",
+        limits=limits,
+    )
+
+    assert receipt.state == "failed"
+    assert receipt.jobs == ()
+    assert receipt.failure is not None
+    assert receipt.failure.error_type == "BatchContractError"
+    assert "must not exceed 86 characters" in receipt.failure.message
+    assert primitive_factory.run_calls == []
 
 
 def test_estimator_partitions_use_the_same_batch_receipt_contract(

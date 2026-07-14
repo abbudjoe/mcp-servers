@@ -115,8 +115,16 @@ jobs:
         env -u QISKIT_IBM_TOKEN .venv-matrix/bin/python -m pytest \
           qiskit-ibm-runtime-mcp-server/tests/ -v \
           --cov=qiskit-ibm-runtime-mcp-server/src \
+          --cov-branch \
           --cov-report=xml:qiskit-ibm-runtime-mcp-server/coverage.xml \
+          --cov-report=json:qiskit-ibm-runtime-mcp-server/coverage.json \
           --cov-report=term-missing
+
+    - name: Enforce safety-critical branch coverage
+      run: |
+        .venv-matrix/bin/python \
+          qiskit-ibm-runtime-mcp-server/scripts/check_safety_branch_coverage.py \
+          qiskit-ibm-runtime-mcp-server/coverage.json
 
     - name: Upload coverage for Runtime server
       uses: codecov/codecov-action@v3

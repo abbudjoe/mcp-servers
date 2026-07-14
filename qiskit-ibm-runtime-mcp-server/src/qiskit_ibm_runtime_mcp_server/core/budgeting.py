@@ -89,6 +89,14 @@ class ApprovalError(BudgetContractError):
     """Raised before submission when approval is absent, stale, or mismatched."""
 
 
+class IncompleteSubmissionError(ApprovalError):
+    """Raised with typed evidence when a planned submission is not fully accepted."""
+
+    def __init__(self, message: str, submission: ApprovedSubmission) -> None:
+        super().__init__(message)
+        self.submission = submission
+
+
 @dataclass(frozen=True)
 class ResolvedRuntimeTarget:
     """One resolver-owned Runtime instance, plan class, backend, and target."""
@@ -181,6 +189,15 @@ class SubmissionRequest:
     pubs: tuple[SamplerPubSpec | EstimatorPubSpec, ...]
     options: Mapping[str, Any]
     maximum_execution_seconds: int
+
+
+@dataclass(frozen=True)
+class ApprovedSubmissionStep:
+    """One ordered, approval-bound primitive step in a fail-closed live sequence."""
+
+    request: SubmissionRequest
+    policy: BudgetPolicy
+    approval: ApprovalReceipt | None
 
 
 def _software_versions() -> dict[str, str]:
@@ -727,6 +744,24 @@ def create_approval_receipt(
     )
 
 
+def require_fully_submitted(
+    submission: ApprovedSubmission,
+) -> ApprovedSubmission:
+    """Stop a submission sequence unless every planned PUB became a Runtime job."""
+    receipt = submission.receipt
+    if receipt.state != "submitted" or not receipt.jobs:
+        failure = receipt.failure
+        detail = "no provider failure detail"
+        if failure is not None:
+            detail = f"{failure.error_type}: {failure.message}"
+        raise IncompleteSubmissionError(
+            "approved submission did not create every planned Runtime job; "
+            f"state={receipt.state}, jobs={len(receipt.jobs)}; {detail}",
+            submission,
+        )
+    return submission
+
+
 class ApprovedBatchExecutor:
     """Only public live-submit boundary: re-resolve, approve, then delegate once."""
 
@@ -810,6 +845,27 @@ class ApprovedBatchExecutor:
             approval_max_qpu_seconds=approval.max_qpu_seconds,
             receipt=receipt,
         )
+
+    def submit_in_order(
+        self,
+        batch_id: str,
+        steps: Sequence[ApprovedSubmissionStep],
+    ) -> tuple[ApprovedSubmission, ...]:
+        """Submit ordered primitive steps, stopping before the next on any failure."""
+        if not steps:
+            raise BudgetContractError(
+                "an ordered submission requires at least one step"
+            )
+        submissions: list[ApprovedSubmission] = []
+        for step in steps:
+            submission = self.submit(
+                batch_id,
+                step.request,
+                step.policy,
+                step.approval,
+            )
+            submissions.append(require_fully_submitted(submission))
+        return tuple(submissions)
 
     def reconcile_usage(
         self,
