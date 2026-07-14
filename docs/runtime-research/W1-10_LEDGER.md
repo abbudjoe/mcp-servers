@@ -20,7 +20,7 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 - Target contract: an immutable, clean-installable Runtime wrapper release with
   versioned schemas, an exact Workstream 2 dependency pin, and a generic,
   dependency-ordered upstream contribution series
-- Status: `review-pending`
+- Status: `met`
 - Live-compute policy: no QPU submission or paid-compute mutation is authorized
   or required for this workstream
 
@@ -35,7 +35,7 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 | Make the pinned release accessible to Workstream 2. | met | The tag is published at `https://github.com/abbudjoe/mcp-servers.git`; an isolated Python 3.12 install from the exact tag resolved to the tested commit and verified package `0.7.1`, all 35 schemas, and empty execution-span serialization. |
 | Publish an experiment compatibility document. | met | `qiskit-ibm-runtime-mcp-server/docs/EXPERIMENT_COMPATIBILITY.md` records import paths, Python/stack requirements, environment variables, schema versions, modes, limitations, exact tag pin, and 4-second W1-09 usage. |
 | Split upstreamable changes into dependency-ordered PRs without experiment-specific content. | met | Draft PRs 1–10 were restacked from preserved upstream base `8c1abce`. Every PR is one commit over its predecessor; generic fixture IDs, version-neutral PR 10 docs, whole-tip content audit, full Runtime/coverage gate at PR 9, and offline example gate at PR 10 all pass. |
-| Independent spec-conformance review is clean. | pending | Final audit findings were resolved; rereview is required for 0.7.1 evidence and the restacked PRs. |
+| Independent spec-conformance review is clean. | met | Independent rereview found no blocking findings after reproducing the Runtime suite and safety coverage gate, quality/security/schema checks, release hashes and remote pin install, and live PR ancestry/content audits. |
 | Provide the exact Workstream 2 dependency pin. | met | `qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.1#subdirectory=qiskit-ibm-runtime-mcp-server` |
 
 ## Gate evidence
@@ -56,4 +56,8 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
   changelog, migration guide, API reference, and experiment compatibility
   contract.
 - Remote tag install gate: `REMOTE_PIN_INSTALL_OK 0.7.1 35`.
+- Independent assembly rereview: clean, with all nine W1-10 DoD rows
+  classified `met`; the immutable annotation's expanded-SHA typo was classified
+  non-blocking because the tag object, peeled remote ref, resolver, and manifest
+  all identify the exact tested commit.
 - No QPU or paid-compute mutation was performed during W1-10.
