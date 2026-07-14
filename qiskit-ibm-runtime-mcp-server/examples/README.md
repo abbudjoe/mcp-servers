@@ -6,6 +6,7 @@ This directory contains examples demonstrating how to build AI agents that inter
 
 | File | Description |
 |------|-------------|
+| [`research_contracts.py`](research_contracts.py) | Offline exact-circuit, artifact, and schema example; no credentials or QPU call |
 | [`langchain_agent.ipynb`](langchain_agent.ipynb) | **Jupyter Notebook** - Interactive tutorial with step-by-step examples |
 | [`langchain_agent.py`](langchain_agent.py) | **Python Script** - Command-line agent with multiple LLM provider support |
 
@@ -31,11 +32,14 @@ The notebook includes:
 
 The agent can:
 
-- Set up IBM Quantum account credentials
 - List available quantum backends
 - Find the least busy backend
 - Get detailed backend properties
 - List and manage quantum jobs
+
+Direct Sampler/Estimator MCP submission tools are deprecated non-submitting
+compatibility stubs in 0.7.0. Experiment execution must use the typed
+plan/approval API documented in `../docs/API.md`.
 
 ### Supported LLM Providers
 
@@ -212,7 +216,6 @@ python langchain_agent.py --provider anthropic --model claude-3-haiku-20240307
 
 Once running, you can ask the agent questions like:
 
-- "Set up my IBM Quantum account"
 - "What quantum backends are available?"
 - "Which backend has the least queue right now?"
 - "Tell me about the ibm_brisbane backend"
