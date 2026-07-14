@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import io
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock, patch
@@ -32,6 +33,7 @@ from qiskit.primitives.containers import (
     PubResult,
     SamplerPubResult as QiskitSamplerPubResult,
 )
+from qiskit_ibm_runtime.execution_span import DoubleSliceSpan, ExecutionSpans
 
 from qiskit_ibm_runtime_mcp_server.core import (
     ArtifactRef,
@@ -373,6 +375,44 @@ def test_large_known_and_future_arrays_use_artifact_sink(tmp_path: Path) -> None
     assert isinstance(register.counts_by_location, ArtifactRef)
     assert isinstance(register.bitstrings_by_location, ArtifactRef)
     assert isinstance(register.quasi_distributions_by_location, ArtifactRef)
+
+
+def test_large_execution_span_masks_use_artifact_sink(tmp_path: Path) -> None:
+    sink = LocalArtifactCAS(tmp_path / "cas")
+    result = _sampler_result_fixture()
+    start = datetime(2026, 7, 14, 12, tzinfo=timezone.utc)
+    span = DoubleSliceSpan(
+        start,
+        start + timedelta(seconds=2),
+        {0: ((2, 3), slice(0, 2), slice(1, 3))},
+    )
+    result_with_spans = PrimitiveResult(
+        list(result),
+        metadata={"execution": {"execution_spans": ExecutionSpans([span])}},
+    )
+
+    envelope = parse_primitive_result(
+        result_with_spans,
+        primitive="sampler",
+        pub_ids=["s-scalar", "s-vector", "s-matrix"],
+        expected_pub_shapes=[[], [2], [2, 2]],
+        job_id="job-span-artifacts",
+        backend_name="ibm_fixture",
+        sink=sink,
+        threshold_bytes=0,
+    )
+
+    mask = envelope.job_metadata["execution"]["execution_spans"]["spans"][0]["masks"][
+        "0"
+    ]
+    artifact = ArtifactRef.model_validate(mask)
+    assert artifact.kind == "runtime-execution-span-mask:0"
+    assert artifact.metadata["shape"] == [2, 3]
+    assert artifact.metadata["dtype"] == "bool"
+    assert json.loads(sink.get_bytes(artifact)) == [
+        [False, True, True],
+        [False, True, True],
+    ]
 
 
 def test_result_cardinality_and_shape_mismatches_fail_closed(tmp_path: Path) -> None:

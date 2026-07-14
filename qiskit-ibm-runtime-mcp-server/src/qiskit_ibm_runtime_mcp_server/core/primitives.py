@@ -15,11 +15,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Mapping
 from typing import Any, Literal, Protocol, Sequence
 
 import numpy as np
 from qiskit.primitives.containers import BitArray, EstimatorPub, SamplerPub
 from qiskit.quantum_info import SparsePauliOp
+from qiskit_ibm_runtime.execution_span import ExecutionSpan, ExecutionSpans
 
 from .artifacts import ArtifactSink, artifactize
 from .circuits import load_circuit_artifact
@@ -243,8 +245,83 @@ def _shaped_result(
     )
 
 
-def _safe_metadata(value: Any, *, name: str) -> dict[str, Any]:
-    safe = to_json_safe(value or {})
+def _metadata_json(
+    value: Any,
+    *,
+    sink: ArtifactSink,
+    threshold_bytes: int,
+) -> Any:
+    """Preserve Runtime metadata while artifact-backing large span masks."""
+    if isinstance(value, ExecutionSpans):
+        return {
+            "$runtime_type": "ExecutionSpans",
+            "start": to_json_safe(value.start),
+            "stop": to_json_safe(value.stop),
+            "duration": to_json_safe(value.duration),
+            "pub_idxs": to_json_safe(value.pub_idxs),
+            "spans": [
+                _metadata_json(
+                    span,
+                    sink=sink,
+                    threshold_bytes=threshold_bytes,
+                )
+                for span in value
+            ],
+        }
+    if isinstance(value, ExecutionSpan):
+        masks: dict[str, Any] = {}
+        for pub_idx in value.pub_idxs:
+            wrapped = _artifact_value(
+                value.mask(pub_idx),
+                sink=sink,
+                threshold_bytes=threshold_bytes,
+                kind=f"runtime-execution-span-mask:{pub_idx}",
+            )
+            masks[str(pub_idx)] = (
+                wrapped.value
+                if isinstance(wrapped, InlineJsonValue)
+                else wrapped.model_dump(mode="json")
+            )
+        return {
+            "$runtime_type": type(value).__name__,
+            "start": to_json_safe(value.start),
+            "stop": to_json_safe(value.stop),
+            "duration": to_json_safe(value.duration),
+            "size": to_json_safe(value.size),
+            "pub_idxs": to_json_safe(value.pub_idxs),
+            "masks": masks,
+        }
+    if isinstance(value, Mapping):
+        converted: dict[str, Any] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                return to_json_safe(value)
+            converted[key] = _metadata_json(
+                item,
+                sink=sink,
+                threshold_bytes=threshold_bytes,
+            )
+        return converted
+    if isinstance(value, (list, tuple)):
+        return [
+            _metadata_json(item, sink=sink, threshold_bytes=threshold_bytes)
+            for item in value
+        ]
+    return to_json_safe(value)
+
+
+def _safe_metadata(
+    value: Any,
+    *,
+    name: str,
+    sink: ArtifactSink,
+    threshold_bytes: int,
+) -> dict[str, Any]:
+    safe = _metadata_json(
+        value or {},
+        sink=sink,
+        threshold_bytes=threshold_bytes,
+    )
     if not isinstance(safe, dict):
         raise PrimitiveContractError(f"{name} metadata must be a JSON object")
     return safe
@@ -329,7 +406,12 @@ def _parse_sampler_pub(
         pub_index=pub_index,
         data_bin_shape=list(data_shape),
         registers=registers,
-        metadata=_safe_metadata(pub_result.metadata, name=f"PUB {pub_id}"),
+        metadata=_safe_metadata(
+            pub_result.metadata,
+            name=f"PUB {pub_id}",
+            sink=sink,
+            threshold_bytes=threshold_bytes,
+        ),
         extensions=extensions,
     )
 
@@ -411,7 +493,12 @@ def _parse_estimator_pub(
         expectation_values=evs,
         standard_deviations=stds,
         ensemble_standard_error=ensemble,
-        metadata=_safe_metadata(pub_result.metadata, name=f"PUB {pub_id}"),
+        metadata=_safe_metadata(
+            pub_result.metadata,
+            name=f"PUB {pub_id}",
+            sink=sink,
+            threshold_bytes=threshold_bytes,
+        ),
         extensions=extensions,
     )
 
@@ -468,7 +555,12 @@ def parse_primitive_result(
         job_id=job_id,
         backend_name=backend_name,
         pub_results=parsed,
-        job_metadata=_safe_metadata(result.metadata, name="job result"),
+        job_metadata=_safe_metadata(
+            result.metadata,
+            name="job result",
+            sink=sink,
+            threshold_bytes=threshold_bytes,
+        ),
         actual_qpu_seconds=actual_qpu_seconds,
         usage=usage,
     )
