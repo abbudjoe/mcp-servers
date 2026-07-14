@@ -1,0 +1,117 @@
+{
+  "$id": "https://qiskit.org/schemas/runtime-contracts/v1.0/backend-snapshot.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "Versioned metadata snapshot populated by the snapshot service.",
+  "properties": {
+    "backend_name": {
+      "minLength": 1,
+      "title": "Backend Name",
+      "type": "string"
+    },
+    "coupling_edges": {
+      "items": {
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "title": "Coupling Edges",
+      "type": "array"
+    },
+    "faulty_instructions": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Faulty Instructions",
+      "type": "array"
+    },
+    "faulty_qubits": {
+      "items": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Faulty Qubits",
+      "type": "array"
+    },
+    "instance_id": {
+      "minLength": 1,
+      "title": "Instance Id",
+      "type": "string"
+    },
+    "instructions": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Instructions",
+      "type": "array"
+    },
+    "properties_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Properties At"
+    },
+    "qubits": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Qubits",
+      "type": "array"
+    },
+    "retrieved_at": {
+      "format": "date-time",
+      "title": "Retrieved At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "snapshot_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Snapshot Hash",
+      "type": "string"
+    },
+    "software_versions": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Software Versions",
+      "type": "object"
+    },
+    "target_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Target Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "backend_name",
+    "instance_id",
+    "retrieved_at",
+    "properties_at",
+    "target_hash",
+    "snapshot_hash",
+    "qubits",
+    "instructions",
+    "coupling_edges",
+    "faulty_qubits",
+    "faulty_instructions",
+    "software_versions"
+  ],
+  "title": "BackendSnapshot",
+  "type": "object",
+  "x-schema-version": "1.0"
+}

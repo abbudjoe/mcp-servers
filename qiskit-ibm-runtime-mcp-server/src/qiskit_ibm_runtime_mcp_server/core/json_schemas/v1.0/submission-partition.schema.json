@@ -1,0 +1,60 @@
+{
+  "$id": "https://qiskit.org/schemas/runtime-contracts/v1.0/submission-partition.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "Deterministic grouping of PUB identities for one Runtime job.",
+  "properties": {
+    "estimated_qpu_seconds": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Estimated Qpu Seconds"
+    },
+    "maximum_execution_seconds": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Maximum Execution Seconds"
+    },
+    "partition_id": {
+      "minLength": 1,
+      "title": "Partition Id",
+      "type": "string"
+    },
+    "pub_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Pub Ids",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "partition_id",
+    "pub_ids"
+  ],
+  "title": "SubmissionPartition",
+  "type": "object",
+  "x-schema-version": "1.0"
+}
