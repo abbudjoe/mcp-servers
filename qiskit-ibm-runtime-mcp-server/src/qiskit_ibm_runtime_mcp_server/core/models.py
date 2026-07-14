@@ -74,6 +74,66 @@ class ArtifactRef(VersionedContractModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class CircuitRegister(ContractModel):
+    """One named register and its exact positions in the circuit bit arrays."""
+
+    kind: Literal["quantum", "classical"]
+    name: str = Field(min_length=1)
+    size: NonNegativeInt
+    bit_indices: list[NonNegativeInt]
+
+    @model_validator(mode="after")
+    def _register_positions_match_size(self) -> CircuitRegister:
+        if len(self.bit_indices) != self.size:
+            raise ValueError("register bit_indices length must equal register size")
+        if len(set(self.bit_indices)) != len(self.bit_indices):
+            raise ValueError("register bit_indices must not contain duplicates")
+        return self
+
+
+class CircuitProvenance(ContractModel):
+    """Typed origin and transformation record for immutable circuit bytes."""
+
+    transformation: Literal["source", "transpile"]
+    source_circuit_hash: Sha256Id | None = Field(
+        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
+    )
+    source_artifact_id: Sha256Id | None = Field(
+        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
+    )
+    target_hash: Sha256Id | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
+    compiler_target_hash: Sha256Id | None = Field(
+        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
+    )
+    target_name: str | None = None
+    transpiler_name: str | None = None
+    transpiler_options: dict[str, Any] = Field(default_factory=dict)
+    software_versions: dict[str, str]
+
+    @model_validator(mode="after")
+    def _transformation_fields_are_aligned(self) -> CircuitProvenance:
+        transformed_fields = (
+            self.source_circuit_hash,
+            self.source_artifact_id,
+            self.target_hash,
+            self.compiler_target_hash,
+            self.target_name,
+            self.transpiler_name,
+        )
+        if self.transformation == "source":
+            if any(value is not None for value in transformed_fields):
+                raise ValueError(
+                    "source provenance cannot claim a target or transformation parent"
+                )
+            if self.transpiler_options:
+                raise ValueError("source provenance cannot contain transpiler options")
+        elif any(value is None for value in transformed_fields):
+            raise ValueError(
+                "transpile provenance requires source, target, and transpiler identity"
+            )
+        return self
+
+
 class CircuitArtifact(VersionedContractModel):
     """Exact serialized circuit plus structural and writer provenance."""
 
@@ -85,16 +145,59 @@ class CircuitArtifact(VersionedContractModel):
     size: NonNegativeInt
     depth: NonNegativeInt | None
     parameter_names: list[str]
-    qiskit_version: str = Field(min_length=1)
+    registers: list[CircuitRegister]
+    metadata: dict[str, Any]
+    qiskit_version: str | None = Field(min_length=1)
+    reader_qiskit_version: str = Field(min_length=1)
     qpy_version: NonNegativeInt | None
+    qpy_symbolic_encoding: str | None = Field(min_length=1, max_length=1)
     layout: dict[str, Any] | None
+    provenance: CircuitProvenance
 
     @model_validator(mode="after")
     def _format_version_contract(self) -> CircuitArtifact:
         if self.format == "qpy" and self.qpy_version is None:
             raise ValueError("qpy artifacts require qpy_version")
+        if self.format == "qpy" and self.qiskit_version is None:
+            raise ValueError("qpy artifacts require Qiskit writer version metadata")
+        if (
+            self.format == "qpy"
+            and self.qpy_version is not None
+            and self.qpy_version >= 10
+            and self.qpy_symbolic_encoding is None
+        ):
+            raise ValueError(
+                "QPY version 10 or newer requires symbolic encoding metadata"
+            )
         if self.format == "qasm3" and self.qpy_version is not None:
             raise ValueError("qasm3 artifacts cannot declare qpy_version")
+        if self.format == "qasm3" and self.qpy_symbolic_encoding is not None:
+            raise ValueError("qasm3 artifacts cannot declare QPY symbolic encoding")
+        if self.circuit_hash != self.artifact.artifact_id:
+            raise ValueError("circuit_hash must identify the exact artifact bytes")
+        expected_media_type = (
+            "application/qpy" if self.format == "qpy" else "text/qasm3"
+        )
+        if self.artifact.kind != "circuit":
+            raise ValueError("circuit artifacts require artifact kind 'circuit'")
+        if self.artifact.media_type != expected_media_type:
+            raise ValueError(
+                f"{self.format} circuit artifacts require media type {expected_media_type}"
+            )
+        if any(
+            bit_index >= self.num_qubits
+            for register in self.registers
+            if register.kind == "quantum"
+            for bit_index in register.bit_indices
+        ):
+            raise ValueError("quantum register bits must belong to the circuit")
+        if any(
+            bit_index >= self.num_clbits
+            for register in self.registers
+            if register.kind == "classical"
+            for bit_index in register.bit_indices
+        ):
+            raise ValueError("classical register bits must belong to the circuit")
         return self
 
 
