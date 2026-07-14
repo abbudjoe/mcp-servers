@@ -1,0 +1,162 @@
+{
+  "$defs": {
+    "ArtifactRef": {
+      "additionalProperties": true,
+      "description": "Portable reference to immutable content-addressed bytes.",
+      "properties": {
+        "artifact_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "kind": {
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "storage_uri": {
+          "minLength": 1,
+          "title": "Storage Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_id",
+        "kind",
+        "media_type",
+        "size_bytes",
+        "storage_uri"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    }
+  },
+  "$id": "https://qiskit.org/schemas/runtime-contracts/v1.0/circuit-artifact.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "Exact serialized circuit plus structural and writer provenance.",
+  "properties": {
+    "artifact": {
+      "$ref": "#/$defs/ArtifactRef"
+    },
+    "circuit_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Circuit Hash",
+      "type": "string"
+    },
+    "depth": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Depth"
+    },
+    "format": {
+      "enum": [
+        "qpy",
+        "qasm3"
+      ],
+      "title": "Format",
+      "type": "string"
+    },
+    "layout": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Layout"
+    },
+    "num_clbits": {
+      "minimum": 0,
+      "title": "Num Clbits",
+      "type": "integer"
+    },
+    "num_qubits": {
+      "minimum": 0,
+      "title": "Num Qubits",
+      "type": "integer"
+    },
+    "parameter_names": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Parameter Names",
+      "type": "array"
+    },
+    "qiskit_version": {
+      "minLength": 1,
+      "title": "Qiskit Version",
+      "type": "string"
+    },
+    "qpy_version": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Qpy Version"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "size": {
+      "minimum": 0,
+      "title": "Size",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "artifact",
+    "format",
+    "circuit_hash",
+    "num_qubits",
+    "num_clbits",
+    "size",
+    "depth",
+    "parameter_names",
+    "qiskit_version",
+    "qpy_version",
+    "layout"
+  ],
+  "title": "CircuitArtifact",
+  "type": "object",
+  "x-schema-version": "1.0"
+}

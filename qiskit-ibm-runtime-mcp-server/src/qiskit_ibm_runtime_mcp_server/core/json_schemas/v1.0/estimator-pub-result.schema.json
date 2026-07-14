@@ -1,0 +1,160 @@
+{
+  "$defs": {
+    "ArtifactRef": {
+      "additionalProperties": true,
+      "description": "Portable reference to immutable content-addressed bytes.",
+      "properties": {
+        "artifact_id": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "kind": {
+          "minLength": 1,
+          "title": "Kind",
+          "type": "string"
+        },
+        "media_type": {
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "storage_uri": {
+          "minLength": 1,
+          "title": "Storage Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_id",
+        "kind",
+        "media_type",
+        "size_bytes",
+        "storage_uri"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    },
+    "InlineJsonValue": {
+      "additionalProperties": true,
+      "description": "Explicit inline branch for values that may instead be artifact-backed.",
+      "properties": {
+        "kind": {
+          "const": "inline_json",
+          "title": "Kind",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "schema_version",
+        "kind",
+        "value"
+      ],
+      "title": "InlineJsonValue",
+      "type": "object"
+    },
+    "JsonValue": {}
+  },
+  "$id": "https://qiskit.org/schemas/runtime-contracts/v1.0/estimator-pub-result.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "Ordered result for one Estimator PUB without collapsing array shape.",
+  "properties": {
+    "ensemble_standard_error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InlineJsonValue"
+        },
+        {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ensemble Standard Error"
+    },
+    "expectation_values": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InlineJsonValue"
+        },
+        {
+          "$ref": "#/$defs/ArtifactRef"
+        }
+      ],
+      "title": "Expectation Values"
+    },
+    "extensions": {
+      "additionalProperties": true,
+      "title": "Extensions",
+      "type": "object"
+    },
+    "metadata": {
+      "additionalProperties": true,
+      "title": "Metadata",
+      "type": "object"
+    },
+    "pub_id": {
+      "minLength": 1,
+      "title": "Pub Id",
+      "type": "string"
+    },
+    "pub_index": {
+      "minimum": 0,
+      "title": "Pub Index",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "standard_deviations": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InlineJsonValue"
+        },
+        {
+          "$ref": "#/$defs/ArtifactRef"
+        }
+      ],
+      "title": "Standard Deviations"
+    }
+  },
+  "required": [
+    "schema_version",
+    "pub_id",
+    "pub_index",
+    "expectation_values",
+    "standard_deviations"
+  ],
+  "title": "EstimatorPubResult",
+  "type": "object",
+  "x-schema-version": "1.0"
+}
