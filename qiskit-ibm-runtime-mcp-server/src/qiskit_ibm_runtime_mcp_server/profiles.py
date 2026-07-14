@@ -38,6 +38,7 @@ RESEARCH_TOOL_NAMES = frozenset(
         "find_optimal_qv_qubits_tool",
         "get_backend_calibration_tool",
         "get_backend_properties_tool",
+        "get_backend_snapshot_tool",
         "get_coupling_map_tool",
         "get_job_results_tool",
         "get_job_status_tool",

@@ -17,6 +17,7 @@ import contextlib
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from typing import Any, Literal
 
 from qiskit.quantum_info import SparsePauliOp
@@ -26,6 +27,10 @@ from qiskit_ibm_runtime.fake_provider import FakeProviderForBackendV2
 from qiskit_ibm_runtime.options import EstimatorOptions, SamplerOptions
 from qiskit_mcp_server.circuit_serialization import CircuitFormat, load_circuit
 
+from qiskit_ibm_runtime_mcp_server.core.snapshots import (
+    FractionalGateMode,
+    resolve_backend_snapshot,
+)
 from qiskit_ibm_runtime_mcp_server.security import install_secret_redaction
 from qiskit_ibm_runtime_mcp_server.utils import with_sync
 
@@ -418,6 +423,47 @@ async def get_backend_properties(backend_name: str) -> dict[str, Any]:
         }
 
 
+@with_sync
+async def get_backend_snapshot(
+    backend_name: str,
+    properties_at: datetime | None = None,
+    fractional_gate_mode: FractionalGateMode = "disabled",
+    dynamic_circuits: bool = False,
+    pec: bool = False,
+    pea: bool = False,
+    gate_twirling: bool = False,
+) -> dict[str, Any]:
+    """Return a complete typed snapshot for one explicitly named backend.
+
+    This function performs metadata reads only. It never selects a backend and
+    never instantiates or submits a Runtime primitive.
+    """
+    global service
+
+    try:
+        instance_id = require_runtime_instance()
+        if service is None:
+            service = initialize_service(instance=instance_id)
+        snapshot = resolve_backend_snapshot(
+            service,
+            backend_name=backend_name,
+            instance_id=instance_id,
+            properties_at=properties_at,
+            fractional_gate_mode=fractional_gate_mode,
+            dynamic_circuits=dynamic_circuits,
+            pec=pec,
+            pea=pea,
+            gate_twirling=gate_twirling,
+        )
+        return {"status": "success", "snapshot": snapshot.model_dump(mode="json")}
+    except Exception as error:
+        logger.error("Failed to get backend snapshot: %s", error)
+        return {
+            "status": "error",
+            "message": f"Failed to get backend snapshot: {error!s}",
+        }
+
+
 def _get_fake_backend(backend_name: str) -> Any:
     """
     Get a fake backend by name from the FakeProviderForBackendV2.
@@ -580,7 +626,7 @@ def _get_gate_errors(
 
     # Single-qubit gates
     for gate in single_qubit_gates:
-        for qubit in qubit_indices[:5]:
+        for qubit in qubit_indices:
             with contextlib.suppress(Exception):
                 error = properties.gate_error(gate, [qubit])
                 if error is not None:
@@ -590,7 +636,7 @@ def _get_gate_errors(
 
     # Two-qubit gates
     for gate in two_qubit_gates:
-        for edge in coupling_map[:5]:
+        for edge in coupling_map:
             with contextlib.suppress(Exception):
                 error = properties.gate_error(gate, edge)
                 if error is not None:
@@ -1111,8 +1157,8 @@ async def get_backend_calibration(
 
     Args:
         backend_name: Name of the backend
-        qubit_indices: Optional list of qubit indices to get data for.
-                      If None, returns data for all qubits (limited to first 10 for brevity).
+        qubit_indices: Optional explicit subset of qubit indices. If None,
+            returns data for every backend qubit.
 
     Returns:
         Calibration data including T1, T2 times and error rates
@@ -1166,7 +1212,7 @@ async def get_backend_calibration(
 
         # Determine which qubits to report on
         if qubit_indices is None:
-            qubit_indices = list(range(min(10, num_qubits)))
+            qubit_indices = list(range(num_qubits))
         else:
             qubit_indices = [q for q in qubit_indices if 0 <= q < num_qubits]
 

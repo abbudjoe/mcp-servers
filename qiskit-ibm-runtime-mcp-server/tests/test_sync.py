@@ -25,6 +25,7 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     find_optimal_qv_qubits,
     get_backend_calibration,
     get_backend_properties,
+    get_backend_snapshot,
     get_coupling_map,
     get_job_results,
     get_job_status,
@@ -56,6 +57,11 @@ class TestWithSyncDecorator:
         """Test get_backend_properties has .sync attribute."""
         assert hasattr(get_backend_properties, "sync")
         assert callable(get_backend_properties.sync)
+
+    def test_get_backend_snapshot_has_sync(self):
+        """Test get_backend_snapshot has .sync attribute."""
+        assert hasattr(get_backend_snapshot, "sync")
+        assert callable(get_backend_snapshot.sync)
 
     def test_list_my_jobs_has_sync(self):
         """Test list_my_jobs has .sync attribute."""
