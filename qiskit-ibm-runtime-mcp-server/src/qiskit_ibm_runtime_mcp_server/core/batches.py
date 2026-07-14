@@ -56,6 +56,8 @@ from .primitives import (
 
 DuplicatePolicy = Literal["reject", "allow_if_terminal", "allow_live"]
 _VALID_SUBMISSION_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$")
+_RUNTIME_JOB_TAG_MAX_CHARACTERS = 86
+_IDEMPOTENCY_TAG_PREFIX = "qiskit-mcp-idempotency:"
 _TERMINAL_JOB_STATES = frozenset({"DONE", "ERROR", "CANCELLED"})
 _KNOWN_JOB_STATES = frozenset(
     {
@@ -313,7 +315,10 @@ def _backend_name(backend: Any) -> str | None:
 
 def _submission_key_tag(submission_key: str) -> str:
     digest = hashlib.sha256(submission_key.encode("utf-8")).hexdigest()
-    return f"qiskit-mcp-idempotency:{digest}"
+    digest_characters = _RUNTIME_JOB_TAG_MAX_CHARACTERS - len(_IDEMPOTENCY_TAG_PREFIX)
+    if digest_characters < 32:  # pragma: no cover - constant contract invariant
+        raise BatchContractError("Runtime job-tag limit cannot hold a safe digest")
+    return f"{_IDEMPOTENCY_TAG_PREFIX}{digest[:digest_characters]}"
 
 
 def _plan_tag(plan_hash: str) -> str:
@@ -795,7 +800,16 @@ class BatchLifecycle:
             _plan_tag(plan.plan_hash),
             f"qiskit-mcp-partition:{partition_id}",
         ]
-        environment["job_tags"] = list(dict.fromkeys([*raw_tags, *internal_tags]))
+        job_tags = list(dict.fromkeys([*raw_tags, *internal_tags]))
+        oversized_tags = [
+            tag for tag in job_tags if len(tag) > _RUNTIME_JOB_TAG_MAX_CHARACTERS
+        ]
+        if oversized_tags:
+            raise BatchContractError(
+                "resolved Runtime job tags must not exceed "
+                f"{_RUNTIME_JOB_TAG_MAX_CHARACTERS} characters"
+            )
+        environment["job_tags"] = job_tags
         options["environment"] = environment
         return options
 
