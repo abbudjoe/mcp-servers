@@ -1,0 +1,46 @@
+{
+  "$id": "https://qiskit.org/schemas/runtime-research/v1.0/batch-job-receipt.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Immutable acknowledgement for one submitted plan partition.",
+  "properties": {
+    "job_id": {
+      "minLength": 1,
+      "title": "Job Id",
+      "type": "string"
+    },
+    "partition_id": {
+      "minLength": 1,
+      "title": "Partition Id",
+      "type": "string"
+    },
+    "pub_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Pub Ids",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "submitted_at": {
+      "format": "date-time",
+      "title": "Submitted At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "partition_id",
+    "job_id",
+    "pub_ids",
+    "submitted_at"
+  ],
+  "title": "BatchJobReceipt",
+  "type": "object",
+  "x-schema-version": "1.0"
+}

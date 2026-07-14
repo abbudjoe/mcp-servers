@@ -1,0 +1,38 @@
+{
+  "$id": "https://qiskit.org/schemas/runtime-research/v1.0/batch-job-usage.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Per-job QPU usage recovered without interpreting scientific results.",
+  "properties": {
+    "job_id": {
+      "minLength": 1,
+      "title": "Job Id",
+      "type": "string"
+    },
+    "quantum_seconds": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Quantum Seconds"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "job_id",
+    "quantum_seconds"
+  ],
+  "title": "BatchJobUsage",
+  "type": "object",
+  "x-schema-version": "1.0"
+}

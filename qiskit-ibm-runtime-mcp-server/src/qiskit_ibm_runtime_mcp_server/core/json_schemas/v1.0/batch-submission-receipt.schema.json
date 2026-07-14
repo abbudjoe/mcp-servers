@@ -1,0 +1,173 @@
+{
+  "$defs": {
+    "BatchJobReceipt": {
+      "additionalProperties": false,
+      "description": "Immutable acknowledgement for one submitted plan partition.",
+      "properties": {
+        "job_id": {
+          "minLength": 1,
+          "title": "Job Id",
+          "type": "string"
+        },
+        "partition_id": {
+          "minLength": 1,
+          "title": "Partition Id",
+          "type": "string"
+        },
+        "pub_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Pub Ids",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "submitted_at": {
+          "format": "date-time",
+          "title": "Submitted At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "partition_id",
+        "job_id",
+        "pub_ids",
+        "submitted_at"
+      ],
+      "title": "BatchJobReceipt",
+      "type": "object"
+    },
+    "BatchSubmissionFailure": {
+      "additionalProperties": false,
+      "description": "Immutable failure boundary retained alongside any accepted jobs.",
+      "properties": {
+        "error_type": {
+          "minLength": 1,
+          "title": "Error Type",
+          "type": "string"
+        },
+        "failed_at": {
+          "format": "date-time",
+          "title": "Failed At",
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "partition_id": {
+          "minLength": 1,
+          "title": "Partition Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "partition_id",
+        "error_type",
+        "message",
+        "failed_at"
+      ],
+      "title": "BatchSubmissionFailure",
+      "type": "object"
+    }
+  },
+  "$id": "https://qiskit.org/schemas/runtime-research/v1.0/batch-submission-receipt.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Immutable, idempotency-bound receipt for one partitioned submission.",
+  "properties": {
+    "batch_id": {
+      "minLength": 1,
+      "title": "Batch Id",
+      "type": "string"
+    },
+    "completed_at": {
+      "format": "date-time",
+      "title": "Completed At",
+      "type": "string"
+    },
+    "failure": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BatchSubmissionFailure"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "jobs": {
+      "items": {
+        "$ref": "#/$defs/BatchJobReceipt"
+      },
+      "title": "Jobs",
+      "type": "array"
+    },
+    "plan_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Plan Hash",
+      "type": "string"
+    },
+    "pub_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Pub Ids",
+      "type": "array"
+    },
+    "reserved_at": {
+      "format": "date-time",
+      "title": "Reserved At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "submitted",
+        "partial_failure",
+        "failed"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "submission_key": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Submission Key",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "submission_key",
+    "batch_id",
+    "plan_hash",
+    "pub_ids",
+    "jobs",
+    "state",
+    "reserved_at",
+    "completed_at"
+  ],
+  "title": "BatchSubmissionReceipt",
+  "type": "object",
+  "x-schema-version": "1.0"
+}
