@@ -17,16 +17,16 @@ the base shown for its row so every review contains one dependency layer.
 
 | Order | Draft PR | Head branch / commit | PR base | Scope |
 |---:|---|---|---|---|
-| 1 | [#1](https://github.com/abbudjoe/mcp-servers/pull/1) | `codex/upstream-01-stack-lock` / `050c92b` | `codex/upstream-base-8c1abce` | Canonical workspace lock and compatibility gate |
-| 2 | [#2](https://github.com/abbudjoe/mcp-servers/pull/2) | `codex/upstream-02-runtime-security` / `3a46f5c` | `codex/upstream-01-stack-lock` | Explicit instance, credential, and tool-profile boundaries |
-| 3 | [#3](https://github.com/abbudjoe/mcp-servers/pull/3) | `codex/upstream-03-runtime-contracts-artifacts` / `eb404da` | `codex/upstream-02-runtime-security` | Typed models, generic `runtime-contracts` schemas, artifact CAS |
-| 4 | [#4](https://github.com/abbudjoe/mcp-servers/pull/4) | `codex/upstream-04-backend-snapshots` / `9d87c1b` | `codex/upstream-03-runtime-contracts-artifacts` | Complete reproducible backend snapshots |
-| 5 | [#5](https://github.com/abbudjoe/mcp-servers/pull/5) | `codex/upstream-05-circuit-boundary` / `50f3bff` | `codex/upstream-04-backend-snapshots` | Exact circuit boundary and ISA validation |
-| 6 | [#6](https://github.com/abbudjoe/mcp-servers/pull/6) | `codex/upstream-06-primitive-v2-contracts` / `7e03801` | `codex/upstream-05-circuit-boundary` | Ordered Primitive V2 PUB/result contracts |
-| 7 | [#7](https://github.com/abbudjoe/mcp-servers/pull/7) | `codex/upstream-07-batch-lifecycle` / `1c7a4e9` | `codex/upstream-06-primitive-v2-contracts` | Batch lifecycle, idempotency, and recovery |
-| 8 | [#8](https://github.com/abbudjoe/mcp-servers/pull/8) | `codex/upstream-08-qpu-budget-approval` / `f57962c` | `codex/upstream-07-batch-lifecycle` | QPU planning, budgets, and approvals |
-| 9 | [#9](https://github.com/abbudjoe/mcp-servers/pull/9) | `codex/upstream-09-runtime-hardening` / `5f1cf14` | `codex/upstream-08-qpu-budget-approval` | Submission/result contract regressions and fixes |
-| 10 | [#10](https://github.com/abbudjoe/mcp-servers/pull/10) | `codex/upstream-10-runtime-docs` / `d985202` | `codex/upstream-09-runtime-hardening` | Generic changelog, migration, API, and offline example |
+| 1 | [#1](https://github.com/abbudjoe/mcp-servers/pull/1) | `codex/upstream-01-stack-lock` / `9307d24` | `codex/upstream-base-8c1abce` | Canonical workspace lock and compatibility gate |
+| 2 | [#2](https://github.com/abbudjoe/mcp-servers/pull/2) | `codex/upstream-02-runtime-security` / `7eadf14` | `codex/upstream-01-stack-lock` | Explicit instance, credential, and tool-profile boundaries |
+| 3 | [#3](https://github.com/abbudjoe/mcp-servers/pull/3) | `codex/upstream-03-runtime-contracts-artifacts` / `88f799f` | `codex/upstream-02-runtime-security` | Typed models, generic `runtime-contracts` schemas, artifact CAS |
+| 4 | [#4](https://github.com/abbudjoe/mcp-servers/pull/4) | `codex/upstream-04-backend-snapshots` / `b1f5b64` | `codex/upstream-03-runtime-contracts-artifacts` | Complete reproducible backend snapshots |
+| 5 | [#5](https://github.com/abbudjoe/mcp-servers/pull/5) | `codex/upstream-05-circuit-boundary` / `7ae5936` | `codex/upstream-04-backend-snapshots` | Exact circuit boundary and ISA validation |
+| 6 | [#6](https://github.com/abbudjoe/mcp-servers/pull/6) | `codex/upstream-06-primitive-v2-contracts` / `2d4aaab` | `codex/upstream-05-circuit-boundary` | Ordered Primitive V2 PUB/result contracts |
+| 7 | [#7](https://github.com/abbudjoe/mcp-servers/pull/7) | `codex/upstream-07-batch-lifecycle` / `c8cbe8a` | `codex/upstream-06-primitive-v2-contracts` | Batch lifecycle, idempotency, and recovery |
+| 8 | [#8](https://github.com/abbudjoe/mcp-servers/pull/8) | `codex/upstream-08-qpu-budget-approval` / `41fc87f` | `codex/upstream-07-batch-lifecycle` | QPU planning, budgets, and approvals |
+| 9 | [#9](https://github.com/abbudjoe/mcp-servers/pull/9) | `codex/upstream-09-runtime-hardening` / `45e3649` | `codex/upstream-08-qpu-budget-approval` | Submission/result contract regressions, coverage enforcement, and fixes |
+| 10 | [#10](https://github.com/abbudjoe/mcp-servers/pull/10) | `codex/upstream-10-runtime-docs` / `bc9c5d7` | `codex/upstream-09-runtime-hardening` | Version-neutral changelog, migration, API, and offline example |
 
 All heads are published under `https://github.com/abbudjoe/mcp-servers`. The
 series intentionally excludes `docs/runtime-research`, the W1-10 compatibility
