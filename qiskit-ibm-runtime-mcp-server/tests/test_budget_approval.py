@@ -17,41 +17,53 @@ from __future__ import annotations
 import io
 import inspect
 import multiprocessing
+import os
+import stat
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, Literal
 
 import pytest
+import qiskit
 from qiskit import QuantumCircuit, qpy
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_ibm_runtime.fake_provider import FakeAthensV2
 
 from qiskit_ibm_runtime_mcp_server.core.artifacts import LocalArtifactCAS
 from qiskit_ibm_runtime_mcp_server.core.approvals import (
+    ApprovalConsumptionError,
     ApprovalReplayError,
     LocalApprovalConsumptionLedger,
 )
+from qiskit_ibm_runtime_mcp_server.core import approvals as approval_module
+from qiskit_ibm_runtime_mcp_server.core import budgeting as budgeting_module
 from qiskit_ibm_runtime_mcp_server.core.budgeting import (
     ESTIMATION_METHOD,
     ESTIMATION_VERSION,
     ApprovalError,
     ApprovedBatchExecutor,
+    ApprovedSubmissionStep,
     BudgetContractError,
     BudgetLimitError,
+    IncompleteSubmissionError,
     ResolvedRuntimeTarget,
     ServiceRuntimeResourceResolver,
     SubmissionPlanner,
     SubmissionRequest,
     create_approval_receipt,
+    require_fully_submitted,
     submission_plan_payload,
     validate_approval,
 )
 from qiskit_ibm_runtime_mcp_server.core.circuits import ResolvedTarget, ingest_circuit
 from qiskit_ibm_runtime_mcp_server.core.models import (
     ApprovalReceipt,
+    ApprovedSubmission,
     BatchJobReceipt,
     BatchJobUsage,
+    BatchSubmissionFailure,
     BatchSubmissionReceipt,
     BatchUsage,
     BudgetPolicy,
@@ -347,6 +359,37 @@ def test_durable_approval_consumption_is_atomic_across_processes(
         )
 
 
+@pytest.mark.parametrize(
+    ("mode", "owner_offset", "message"),
+    [
+        (stat.S_IFDIR | 0o700, 0, "regular file"),
+        (stat.S_IFREG | 0o600, 1, "owned by the current user"),
+    ],
+)
+def test_approval_ledger_rejects_unsafe_file_identity(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    mode: int,
+    owner_offset: int,
+    message: str,
+) -> None:
+    """The durable one-time ledger must fail closed on file substitution."""
+    ledger = LocalApprovalConsumptionLedger.__new__(LocalApprovalConsumptionLedger)
+    ledger._path = tmp_path / "approval-ledger.sqlite3"  # noqa: SLF001
+    current_uid = os.getuid()
+    monkeypatch.setattr(
+        approval_module.os,
+        "fstat",
+        lambda _descriptor: SimpleNamespace(
+            st_mode=mode,
+            st_uid=current_uid + owner_offset,
+        ),
+    )
+
+    with pytest.raises(ApprovalConsumptionError, match=message):
+        ledger._prepare_database_file()  # noqa: SLF001
+
+
 def test_dry_run_resolves_locked_schedule_complete_options_and_shapes(
     planner_bundle: tuple[SubmissionPlanner, RecordingResolver, SubmissionRequest],
     policy: BudgetPolicy,
@@ -371,7 +414,7 @@ def test_dry_run_resolves_locked_schedule_complete_options_and_shapes(
     assert plan.resolved_options["twirling"]["enable_gates"] is False
     assert plan.estimation_method == ESTIMATION_METHOD
     assert plan.estimation_version == ESTIMATION_VERSION
-    assert plan.estimation_software_versions["qiskit"] == "2.4.2"
+    assert plan.estimation_software_versions["qiskit"] == qiskit.__version__
     assert canonical_json_hash(submission_plan_payload(plan)) == plan.plan_hash
 
 
@@ -471,6 +514,116 @@ def test_estimator_precision_broadcast_and_zne_multiplier_are_resolved(
         )
 
 
+@pytest.mark.parametrize(
+    ("requested", "message"),
+    [
+        ({"max_execution_time": 59}, "must match"),
+        ({"experimental": {"image": "unsupported"}}, "experimental"),
+        ({"simulator": {"seed_simulator": 1}}, "simulator"),
+        ({"unknown_option": True}, "invalid locked Runtime options"),
+    ],
+)
+def test_runtime_option_resolution_rejects_unbounded_inputs(
+    requested: dict[str, Any], message: str
+) -> None:
+    """Unsupported or contradictory options fail before estimation."""
+    with pytest.raises(BudgetContractError, match=message):
+        budgeting_module._resolve_options(  # noqa: SLF001
+            "sampler", requested, 60, 0.001
+        )
+
+
+@pytest.mark.parametrize("value", [True, 0, "1"])
+def test_positive_treatment_counts_are_explicit_integers(value: Any) -> None:
+    with pytest.raises(BudgetContractError, match="positive integer"):
+        budgeting_module._positive_int_option(value, "count")  # noqa: SLF001
+
+
+def test_treatment_multiplier_branches_are_bounded() -> None:
+    """Twirling expands deterministically; unsupported mitigations fail closed."""
+    twirled = budgeting_module._resolve_options(  # noqa: SLF001
+        "sampler",
+        {
+            "twirling": {
+                "enable_gates": True,
+                "enable_measure": True,
+                "num_randomizations": 3,
+                "shots_per_randomization": 16,
+            }
+        },
+        60,
+        0.001,
+    )
+    treatments, multiplier, variants = budgeting_module._treatments_and_multiplier(  # noqa: SLF001
+        "sampler", twirled
+    )
+    assert treatments == ["gate_twirling", "measure_twirling"]
+    assert multiplier == 3
+    assert variants == 3
+
+    estimator_cases = (
+        ({"resilience_level": 1}, "resilience levels"),
+        ({"resilience": {"measure_mitigation": True}}, "measurement mitigation"),
+        ({"resilience": {"pec_mitigation": True}}, "PEC"),
+    )
+    for requested, message in estimator_cases:
+        options = budgeting_module._resolve_options(  # noqa: SLF001
+            "estimator", requested, 60, 0.001
+        )
+        with pytest.raises(BudgetContractError, match=message):
+            budgeting_module._treatments_and_multiplier(  # noqa: SLF001
+                "estimator", options
+            )
+
+
+@pytest.mark.parametrize(
+    "noise_factors",
+    [None, [], [True], [float("nan")], [0.5]],
+)
+def test_zne_noise_factors_are_explicit_finite_bounds(noise_factors: Any) -> None:
+    options = {
+        "dynamical_decoupling": {"enable": False},
+        "twirling": {"enable_gates": False, "enable_measure": False},
+        "resilience_level": 0,
+        "resilience": {
+            "measure_mitigation": False,
+            "zne_mitigation": True,
+            "pec_mitigation": False,
+            "zne": {
+                "amplifier": "gate_folding",
+                "noise_factors": noise_factors,
+            },
+        },
+    }
+    with pytest.raises(BudgetContractError, match="explicit finite values"):
+        budgeting_module._treatments_and_multiplier(  # noqa: SLF001
+            "estimator", options
+        )
+
+
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        ({}, "execution.rep_delay"),
+        ({"execution": {"rep_delay": {"$runtime_default": "Unset"}}}, "rep_delay"),
+        ({"execution": {"rep_delay": True}}, "non-negative"),
+        ({"execution": {"rep_delay": -0.1}}, "non-negative"),
+    ],
+)
+def test_repetition_delay_requires_a_nonnegative_number(
+    options: dict[str, Any], message: str
+) -> None:
+    with pytest.raises(BudgetContractError, match=message):
+        budgeting_module._rep_delay(options)  # noqa: SLF001
+
+
+@pytest.mark.parametrize("value", [True, None, -0.1])
+def test_backend_default_repetition_delay_is_validated(value: Any) -> None:
+    resolved = SimpleNamespace(backend=SimpleNamespace(default_rep_delay=value))
+    with pytest.raises(BudgetContractError, match="non-negative default_rep_delay"):
+        budgeting_module._backend_default_rep_delay(resolved)  # type: ignore[arg-type] # noqa: SLF001
+
+
 def test_planning_enforces_pub_and_shot_limits(
     planner_bundle: tuple[SubmissionPlanner, RecordingResolver, SubmissionRequest],
     policy: BudgetPolicy,
@@ -527,6 +680,81 @@ def test_planning_enforces_pub_and_shot_limits(
     )
     with pytest.raises(BudgetContractError, match="no locked conservative estimator"):
         planner.resolve(dd_request, dd_policy)
+
+
+def test_planner_rejects_each_request_and_resolver_identity_mismatch(
+    planner_bundle: tuple[SubmissionPlanner, RecordingResolver, SubmissionRequest],
+    policy: BudgetPolicy,
+) -> None:
+    """Dry-run validation rejects malformed intent before circuit scheduling."""
+    planner, resolver, request = planner_bundle
+    cases = (
+        (replace(request, plan_id=""), policy, "plan_id"),
+        (replace(request, pubs=()), policy, "at least one PUB"),
+        (
+            replace(request, maximum_execution_seconds=61),
+            policy,
+            "max_execution_seconds",
+        ),
+        (
+            request,
+            policy.model_copy(update={"permitted_primitives": ("estimator",)}),
+            "primitive is not permitted",
+        ),
+        (
+            replace(request, primitive="estimator"),
+            policy,
+            "PUB types do not match",
+        ),
+        (
+            replace(
+                request,
+                options={
+                    "twirling": {
+                        "enable_gates": True,
+                        "num_randomizations": 2,
+                        "shots_per_randomization": 50,
+                    }
+                },
+            ),
+            policy,
+            "treatments are not permitted",
+        ),
+    )
+    for active_request, active_policy, message in cases:
+        with pytest.raises((BudgetContractError, BudgetLimitError), match=message):
+            planner.resolve(active_request, active_policy)
+
+    class StaticResolver:
+        def __init__(self, resolved: ResolvedRuntimeTarget) -> None:
+            self.resolved = resolved
+
+        def resolve(
+            self, _instance_id: str, _backend_name: str
+        ) -> ResolvedRuntimeTarget:
+            return self.resolved
+
+    target = ResolvedTarget(resolver.backend, resolver.snapshot)
+    wrong_instance = ResolvedRuntimeTarget(
+        instance_id="crn:other", instance_plan_type="open", target=target
+    )
+    with pytest.raises(BudgetContractError, match="different Runtime instance"):
+        SubmissionPlanner(StaticResolver(wrong_instance), planner._sink).resolve(  # type: ignore[arg-type] # noqa: SLF001
+            request, policy
+        )
+
+    mismatched_snapshot = resolver.snapshot.model_copy(
+        update={"instance_id": "crn:other"}
+    )
+    wrong_snapshot = ResolvedRuntimeTarget(
+        instance_id="crn:test",
+        instance_plan_type="open",
+        target=ResolvedTarget(resolver.backend, mismatched_snapshot),
+    )
+    with pytest.raises(BudgetContractError, match="snapshot belongs"):
+        SubmissionPlanner(StaticResolver(wrong_snapshot), planner._sink).resolve(  # type: ignore[arg-type] # noqa: SLF001
+            request, policy
+        )
 
 
 Mutation = Callable[[dict[str, Any]], None]
@@ -615,7 +843,10 @@ def _set(path: tuple[str | int, ...], value: Any) -> Mutation:
         ("execution_limit", _set(("maximum_execution_seconds",), 59)),
         ("estimation_method", _set(("estimation_method",), "other")),
         ("estimation_version", _set(("estimation_version",), "2.0")),
-        ("software_version", _set(("estimation_software_versions", "qiskit"), "2.5.0")),
+        (
+            "software_version",
+            _set(("estimation_software_versions", "qiskit"), "999.0.0"),
+        ),
     ],
 )
 def test_every_canonical_execution_field_mutation_invalidates_approval(
@@ -667,6 +898,152 @@ def test_live_submit_reresolves_then_requires_bound_receipt(
         for partition in submitted_plan.partitions
     )
     assert submitted_limits.max_execution_seconds_per_job == 60
+
+
+def _failed_approved_submission(
+    *,
+    state: Literal["failed", "partial_failure"] = "failed",
+    with_job: bool = False,
+) -> ApprovedSubmission:
+    failure = BatchSubmissionFailure(
+        schema_version="1.0",
+        partition_id="partition-1",
+        error_type="IBMInputValueError",
+        message="provider rejected the Sampler job before creation",
+        failed_at=NOW,
+    )
+    receipt = BatchSubmissionReceipt(
+        schema_version="1.0",
+        submission_key="sampler-key",
+        batch_id="batch-1",
+        plan_hash=f"sha256:{'a' * 64}",
+        pub_ids=("sampler-scalar", "sampler-vector"),
+        jobs=(
+            (
+                BatchJobReceipt(
+                    schema_version="1.0",
+                    partition_id="partition-1",
+                    job_id="job-1",
+                    pub_ids=("sampler-scalar",),
+                    submitted_at=NOW,
+                ),
+            )
+            if with_job
+            else ()
+        ),
+        state=state,
+        reserved_at=NOW,
+        completed_at=NOW,
+        failure=failure,
+    )
+    return ApprovedSubmission(
+        schema_version="1.0",
+        plan_hash=receipt.plan_hash,
+        estimated_qpu_seconds=0.096,
+        approval_max_qpu_seconds=30,
+        receipt=receipt,
+    )
+
+
+def test_failed_submission_stops_before_the_next_primitive(
+    planner_bundle: tuple[SubmissionPlanner, RecordingResolver, SubmissionRequest],
+    policy: BudgetPolicy,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    planner, _, sampler_request = planner_bundle
+    executor = ApprovedBatchExecutor._from_test_components(  # type: ignore[arg-type]
+        planner,
+        RecordingLifecycle(),
+        approval_ledger=RecordingApprovalLedger(),
+        clock=lambda: NOW,
+    )
+    approval = _approval(executor.dry_run(sampler_request, policy))
+    estimator_request = replace(
+        sampler_request,
+        plan_id="estimator-plan",
+        submission_key="estimator-key",
+        primitive="estimator",
+    )
+    primitive_calls: list[str] = []
+    failed = _failed_approved_submission()
+
+    def submit_spy(
+        batch_id: str,
+        request: SubmissionRequest,
+        active_policy: BudgetPolicy,
+        active_approval: ApprovalReceipt | None,
+    ) -> ApprovedSubmission:
+        assert batch_id == "batch-1"
+        assert active_policy is policy
+        assert active_approval is approval
+        primitive_calls.append(request.primitive)
+        return failed
+
+    monkeypatch.setattr(executor, "submit", submit_spy)
+
+    with pytest.raises(
+        IncompleteSubmissionError, match="state=failed, jobs=0"
+    ) as caught:
+        executor.submit_in_order(
+            "batch-1",
+            (
+                ApprovedSubmissionStep(sampler_request, policy, approval),
+                ApprovedSubmissionStep(estimator_request, policy, approval),
+            ),
+        )
+
+    assert primitive_calls == ["sampler"]
+    assert caught.value.submission is failed
+    assert failed.receipt.state == "failed"
+    assert failed.receipt.failure is not None
+    assert failed.receipt.failure.error_type == "IBMInputValueError"
+
+
+def test_partial_failure_is_not_fully_submitted() -> None:
+    submission = _failed_approved_submission(state="partial_failure", with_job=True)
+
+    with pytest.raises(
+        IncompleteSubmissionError, match="state=partial_failure, jobs=1"
+    ):
+        require_fully_submitted(submission)
+
+
+def test_successful_submission_guard_preserves_object_identity() -> None:
+    receipt = BatchSubmissionReceipt(
+        schema_version="1.0",
+        submission_key="sampler-key",
+        batch_id="batch-1",
+        plan_hash=f"sha256:{'a' * 64}",
+        pub_ids=("sampler-scalar",),
+        jobs=(
+            BatchJobReceipt(
+                schema_version="1.0",
+                partition_id="partition-1",
+                job_id="job-1",
+                pub_ids=("sampler-scalar",),
+                submitted_at=NOW,
+            ),
+        ),
+        state="submitted",
+        reserved_at=NOW,
+        completed_at=NOW,
+    )
+    submission = ApprovedSubmission(
+        schema_version="1.0",
+        plan_hash=receipt.plan_hash,
+        estimated_qpu_seconds=0.096,
+        approval_max_qpu_seconds=30,
+        receipt=receipt,
+    )
+
+    assert require_fully_submitted(submission) is submission
+
+
+def test_submission_sequence_guard_is_publicly_exported() -> None:
+    from qiskit_ibm_runtime_mcp_server import core
+
+    assert core.require_fully_submitted is require_fully_submitted
+    assert core.ApprovedSubmissionStep is ApprovedSubmissionStep
 
 
 def test_approved_plan_cannot_be_replayed_under_a_different_submission_key(
@@ -785,6 +1162,123 @@ def test_refusals_never_reach_internal_submission(
         )
 
     assert lifecycle.submissions == []
+
+
+def _rehash_plan(plan: SubmissionPlan, **updates: Any) -> SubmissionPlan:
+    updated = plan.model_copy(update=updates)
+    return updated.model_copy(
+        update={"plan_hash": budgeting_module.submission_plan_hash(updated)}
+    )
+
+
+def test_validation_exercises_every_safety_limit_branch(
+    planner_bundle: tuple[SubmissionPlanner, RecordingResolver, SubmissionRequest],
+    policy: BudgetPolicy,
+) -> None:
+    """Every policy/plan limit is independently enforced after canonical hashing."""
+    planner, _, request = planner_bundle
+    original = planner.resolve(request, policy)
+    approval = _approval(original)
+
+    with pytest.raises(ApprovalError, match="timezone-aware"):
+        validate_approval(original, approval, policy, now=NOW.replace(tzinfo=None))
+    with pytest.raises(ApprovalError, match="does not permit"):
+        validate_approval(
+            original,
+            approval,
+            policy.model_copy(update={"dry_run": True}),
+            now=NOW,
+        )
+    with pytest.raises(ApprovalError, match="policy hash no longer matches"):
+        validate_approval(
+            original,
+            approval,
+            policy.model_copy(update={"max_jobs": policy.max_jobs + 1}),
+            now=NOW,
+        )
+
+    future = approval.model_copy(
+        update={
+            "approved_at": NOW + timedelta(minutes=1),
+            "expires_at": NOW + timedelta(minutes=2),
+        }
+    )
+    with pytest.raises(ApprovalError, match="in the future"):
+        validate_approval(original, future, policy, now=NOW)
+    excessive_ttl = approval.model_copy(
+        update={"expires_at": NOW + timedelta(seconds=policy.approval_ttl_seconds + 1)}
+    )
+    with pytest.raises(ApprovalError, match="exceeds policy approval TTL"):
+        validate_approval(original, excessive_ttl, policy, now=NOW)
+
+    cases: tuple[tuple[dict[str, Any], dict[str, Any], str], ...] = (
+        (
+            {"allowed_instance_ids": ("crn:other",)},
+            {},
+            "instance is not allowed by policy",
+        ),
+        (
+            {"allowed_backends": ("other_backend",)},
+            {},
+            "backend is not allowed by policy",
+        ),
+        (
+            {"permitted_primitives": ("estimator",)},
+            {},
+            "primitive is no longer permitted",
+        ),
+        ({}, {"treatments": ["zne_mitigation"]}, "treatments are no longer permitted"),
+        ({"max_pubs": 0}, {}, "max_pubs"),
+        ({"max_jobs": 0}, {}, "max_jobs"),
+        ({"max_partitions": 0}, {}, "max_partitions"),
+        ({"max_circuits": 0}, {}, "max_circuits"),
+        ({"max_shots_per_pub": 99}, {}, "max_shots_per_pub"),
+        ({"max_estimated_qpu_seconds": 0.05}, {}, "QPU-second limit"),
+        ({"max_execution_seconds": 59}, {}, "max_execution_seconds"),
+        (
+            {},
+            {
+                "resolved_options": original.resolved_options
+                | {"max_execution_time": 59}
+            },
+            "max_execution_time is not canonical",
+        ),
+    )
+    for policy_updates, plan_updates, message in cases:
+        active_policy = policy.model_copy(update=policy_updates)
+        active_plan = _rehash_plan(
+            original,
+            policy_hash=budgeting_module.budget_policy_hash(active_policy),
+            **plan_updates,
+        )
+        active_approval = _approval(active_plan)
+        with pytest.raises((ApprovalError, BudgetLimitError), match=message):
+            validate_approval(
+                active_plan,
+                active_approval,
+                active_policy,
+                now=NOW,
+            )
+
+
+def test_ordered_submission_and_failure_detail_empty_branches(
+    planner_bundle: tuple[SubmissionPlanner, RecordingResolver, SubmissionRequest],
+) -> None:
+    planner, _, _ = planner_bundle
+    executor = ApprovedBatchExecutor._from_test_components(  # type: ignore[arg-type]
+        planner,
+        RecordingLifecycle(),
+        approval_ledger=RecordingApprovalLedger(),
+        clock=lambda: NOW,
+    )
+    with pytest.raises(BudgetContractError, match="at least one step"):
+        executor.submit_in_order("batch-1", ())
+
+    failed = _failed_approved_submission()
+    receipt_without_detail = failed.receipt.model_copy(update={"failure": None})
+    submission = failed.model_copy(update={"receipt": receipt_without_detail})
+    with pytest.raises(IncompleteSubmissionError, match="no provider failure detail"):
+        require_fully_submitted(submission)
 
 
 def test_paid_instance_is_refused_without_dual_explicit_allowance(

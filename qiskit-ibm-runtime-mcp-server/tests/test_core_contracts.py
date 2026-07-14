@@ -25,6 +25,7 @@ from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from pydantic import BaseModel, ValidationError
 from qiskit.primitives.containers import BitArray
+from qiskit_ibm_runtime.execution_span import DoubleSliceSpan, ExecutionSpans
 
 from qiskit_ibm_runtime_mcp_server.core.artifacts import (
     ArtifactCollisionError,
@@ -736,6 +737,48 @@ def test_numpy_datetime64_has_a_unit_stable_iso_representation(unit: str) -> Non
 def test_canonical_json_rejects_non_json_values(value: object) -> None:
     with pytest.raises(JsonConversionError):
         canonical_json(value)
+
+
+def test_canonical_json_preserves_runtime_execution_spans() -> None:
+    span = DoubleSliceSpan(
+        NOW,
+        NOW + timedelta(seconds=2),
+        {0: ((2, 3), slice(0, 2), slice(1, 3))},
+    )
+
+    converted = json.loads(canonical_json(ExecutionSpans([span])))
+
+    assert converted == {
+        "$runtime_type": "ExecutionSpans",
+        "start": "2026-07-13T12:00:00.000000Z",
+        "stop": "2026-07-13T12:00:02.000000Z",
+        "duration": 2.0,
+        "pub_idxs": [0],
+        "spans": [
+            {
+                "$runtime_type": "DoubleSliceSpan",
+                "start": "2026-07-13T12:00:00.000000Z",
+                "stop": "2026-07-13T12:00:02.000000Z",
+                "duration": 2.0,
+                "size": 4,
+                "pub_idxs": [0],
+                "masks": {
+                    "0": [[False, True, True], [False, True, True]],
+                },
+            }
+        ],
+    }
+
+
+def test_empty_runtime_execution_spans_have_a_stable_json_contract() -> None:
+    assert json.loads(canonical_json(ExecutionSpans([]))) == {
+        "$runtime_type": "ExecutionSpans",
+        "start": None,
+        "stop": None,
+        "duration": 0.0,
+        "pub_idxs": [],
+        "spans": [],
+    }
 
 
 def test_observable_forms_cannot_be_ambiguously_interchanged() -> None:

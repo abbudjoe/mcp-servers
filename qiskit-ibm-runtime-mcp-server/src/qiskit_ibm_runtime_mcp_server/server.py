@@ -85,13 +85,14 @@ Credentials are never accepted by tools or persisted by this server.
 3. Use list_backends_tool to see available backends, or least_busy_backend_tool \
 to quickly find one with a short queue.
 
-Running circuits:
-1. Use run_sampler_tool for measurement sampling (bitstring counts) or \
-run_estimator_tool for expectation value estimation.
-2. Jobs are ASYNCHRONOUS. After submitting, use get_job_status_tool to poll \
-until the job completes, then get_job_results_tool to retrieve results.
-3. Browse circuits:// resources (bell-state, ghz-state, random, superposition) \
-for ready-to-run example circuits.
+Execution safety:
+- Direct run_sampler_tool and run_estimator_tool submission is disabled. They are \
+deprecated compatibility stubs and return an error without creating a job.
+- Live work must be prepared outside the MCP surface with the typed SubmissionPlan, \
+ApprovalReceipt, and ApprovedBatchExecutor API.
+- Use get_job_status_tool and get_job_results_tool only for already-submitted jobs.
+- circuits:// resources are generic circuit inputs; retrieving one never authorizes \
+or submits Runtime work.
 
 Backend analysis:
 - Use get_backend_properties_tool for static info (processor type, basis gates, \
@@ -369,7 +370,7 @@ async def get_job_results_tool(
     pub_ids and pub_shapes returned by typed submission to preserve caller-owned identity
     and validate returned shapes. Omitting all three invokes a deprecated inference path.
 
-    Use this tool after a job submitted with run_sampler_tool has completed.
+    Use this tool for an already-submitted job with caller-owned PUB identity.
     First check the job status with get_job_status_tool, then retrieve results
     when the job status is DONE.
 
@@ -419,76 +420,10 @@ async def run_estimator_tool(
     zne_mitigation: bool = True,
     zne_noise_factors: tuple[float, ...] | None = None,
 ) -> dict[str, Any]:
-    """Run a quantum circuit using the Qiskit Runtime EstimatorV2 primitive.
+    """Return an error without submitting; retained as a deprecated compatibility stub.
 
-    The Estimator primitive computes expectation values of observables for quantum circuits.
-    This is essential for variational quantum algorithms (VQE, QAOA), quantum chemistry
-    simulations, and any application requiring expectation value estimation.
-
-    Error Mitigation:
-        This function includes built-in error mitigation techniques enabled by default:
-        - Resilience Levels: Automatic error mitigation strategies
-        - ZNE (Zero Noise Extrapolation): Extrapolates to zero-noise limit
-
-    Args:
-        circuit: The quantum circuit to execute. Accepts multiple formats:
-                - OpenQASM 3.0 string (recommended):
-                  ```
-                  OPENQASM 3.0;
-                  include "stdgates.inc";
-                  qubit[2] q;
-                  h q[0];
-                  cx q[0], q[1];
-                  ```
-                - OpenQASM 2.0 string (legacy, auto-detected)
-                - Base64-encoded QPY binary (for tool chaining with transpiler output)
-                The circuit can be parameterized (use parameter_values to bind).
-        observables: Observable(s) to measure expectation values. Accepts:
-                    - Single Pauli string: "IIXY" (identity on qubits 0,1; X on 2; Y on 3)
-                    - List of Pauli strings: ["IIXY", "ZZII", "XXYY"]
-                    - Weighted Hamiltonian as list of (Pauli, coefficient) tuples:
-                      [("IIXY", 0.5), ("ZZII", -0.3), ("XXYY", 0.2)]
-                    Pauli strings use: I (identity), X, Y, Z for each qubit position.
-        parameter_values: Values for parameterized circuits. If the circuit has parameters
-                         (e.g., rotation angles), provide a list of float values in the
-                         same order as circuit.parameters. Optional if circuit has no parameters.
-        backend_name: Name of the IBM Quantum backend (e.g., 'ibm_brisbane').
-                     If not provided, uses the least busy operational backend.
-        circuit_format: Format of the circuit input. Options:
-                       - "auto" (default): Automatically detect format
-                       - "qasm3": OpenQASM 3.0/2.0 text format
-                       - "qpy": Base64-encoded QPY binary format
-        optimization_level: Qiskit transpilation optimization level (0-3). Default is 1.
-                           Higher levels may produce better circuits but take longer.
-                           - 0: No optimization
-                           - 1: Light optimization (default, good balance)
-                           - 2: Heavy optimization
-                           - 3: Highest optimization (slowest)
-        resilience_level: Error mitigation resilience level (0-2). Default is 1.
-                         - 0: No error mitigation
-                         - 1: Light error mitigation (default, recommended)
-                         - 2: Heavy error mitigation (slower but more accurate)
-        zne_mitigation: Enable Zero Noise Extrapolation (ZNE). Default is True.
-                       ZNE extrapolates results to the zero-noise limit for better accuracy.
-        zne_noise_factors: Noise amplification factors for ZNE. Default is (1, 1.5, 2).
-                          Only used if zne_mitigation is True.
-
-    Returns:
-        Job submission status including:
-        - job_id: Use with get_job_status_tool to check completion
-        - backend: The backend where the circuit will run
-        - error_mitigation: Summary of enabled error mitigation techniques
-        - message: Status message
-        - note: Information about retrieving results
-
-    Note:
-        Jobs run asynchronously. Use get_job_status_tool to monitor progress,
-        then get_job_results_tool to retrieve expectation values when complete.
-
-    Example observables:
-        - Single Z measurement on qubit 0: "Z"
-        - Z on qubits 0 and 1: "ZZ"
-        - Hamiltonian H = 0.5*X₀X₁ - 0.3*Z₀Z₁: [("XX", 0.5), ("ZZ", -0.3)]
+    Live execution requires the Python ``SubmissionPlan`` / ``ApprovalReceipt`` /
+    ``ApprovedBatchExecutor`` control plane.
     """
     return await run_estimator(
         circuit,
@@ -567,59 +502,10 @@ async def run_sampler_tool(
     twirling: bool = True,
     measure_twirling: bool = True,
 ) -> dict[str, Any]:
-    """Run a quantum circuit using the Qiskit Runtime SamplerV2 primitive.
+    """Return an error without submitting; retained as a deprecated compatibility stub.
 
-    The Sampler primitive executes quantum circuits and returns measurement outcome
-    samples. This is the primary way to run quantum circuits on IBM Quantum hardware.
-
-    Error Mitigation (enabled by default):
-        - Dynamical Decoupling: Suppresses decoherence during idle periods
-        - Twirling: Randomizes errors into stochastic noise for better results
-
-    Args:
-        circuit: The quantum circuit to execute. Accepts multiple formats:
-                - OpenQASM 3.0 string (recommended):
-                  ```
-                  OPENQASM 3.0;
-                  include "stdgates.inc";
-                  qubit[2] q;
-                  bit[2] c;
-                  h q[0];
-                  cx q[0], q[1];
-                  c = measure q;
-                  ```
-                - OpenQASM 2.0 string (legacy, auto-detected)
-                - Base64-encoded QPY binary (for tool chaining with transpiler output)
-                Must include measurement operations to produce results.
-        backend_name: Name of the IBM Quantum backend (e.g., 'ibm_brisbane').
-                     If not provided, uses the least busy operational backend.
-        shots: Number of measurement shots (repetitions). Default is 4096.
-               Higher values give more statistical accuracy.
-        circuit_format: Format of the circuit input. Options:
-                       - "auto" (default): Automatically detect format
-                       - "qasm3": OpenQASM 3.0/2.0 text format
-                       - "qpy": Base64-encoded QPY binary format
-        dynamical_decoupling: Enable dynamical decoupling to suppress decoherence
-                             during idle periods. Default is True (recommended).
-        dd_sequence: Dynamical decoupling pulse sequence. Options:
-                    - "XX": Basic X-X sequence
-                    - "XpXm": X+/X- sequence
-                    - "XY4": 4-pulse XY sequence (default, most robust)
-        twirling: Enable Pauli twirling on 2-qubit gates to convert coherent
-                 errors into stochastic noise. Default is True (recommended).
-        measure_twirling: Enable twirling on measurements for readout error
-                         mitigation. Default is True (recommended).
-
-    Returns:
-        Job submission status including:
-        - job_id: Use with get_job_status_tool to check completion
-        - backend: The backend where the circuit will run
-        - shots: Number of shots requested
-        - error_mitigation: Summary of enabled techniques
-
-    Note:
-        Jobs run asynchronously. Use get_job_status_tool to monitor progress.
-        Results contain measurement bitstrings and their occurrence counts.
+    Live execution requires the Python ``SubmissionPlan`` / ``ApprovalReceipt`` /
+    ``ApprovedBatchExecutor`` control plane.
     """
     return await run_sampler(
         circuit,
@@ -641,19 +527,19 @@ async def run_sampler_tool(
 
 @mcp.prompt()
 def run_bell_state(backend_name: str = "") -> str:
-    """Run a Bell state circuit on an IBM Quantum backend and interpret the results."""
+    """Prepare a Bell-state input without authorizing or submitting Runtime work."""
     backend_clause = (
         f"on backend '{backend_name}'"
         if backend_name
         else "on the least busy backend (use least_busy_backend_tool to find it)"
     )
     return (
-        f"Run a Bell state circuit {backend_clause}: "
-        "1) Read the circuits://bell-state resource to get the circuit, "
-        f"2) Call run_sampler_tool with the circuit QPY and backend_name='{backend_name}', "
-        "3) Call get_job_status_tool with the returned job_id until status is DONE, "
-        "4) Call get_job_results_tool to retrieve measurement counts, "
-        "5) Interpret the results - expect approximately 50% '00' and 50% '11' outcomes."
+        f"Prepare a Bell-state experiment input {backend_clause}: "
+        "1) Read circuits://bell-state, "
+        "2) validate and ingest its circuit with the typed Python circuit boundary, "
+        "3) create and human-review a bounded SubmissionPlan, "
+        "4) submit only with a matching ApprovalReceipt through ApprovedBatchExecutor. "
+        "The MCP run_sampler_tool is disabled and this prompt does not submit a job."
     )
 
 
@@ -692,55 +578,55 @@ async def get_service_status_resource() -> str:
     return await get_service_status()
 
 
-# Example Circuit Resources - Pre-built circuits for easy LLM usage
+# Generic circuit input resources; retrieval never authorizes or submits work.
 @mcp.resource("circuits://bell-state", mime_type="application/json")
 def get_bell_state_resource() -> dict[str, Any]:
-    """Get a ready-to-run Bell state (quantum entanglement) circuit.
+    """Get a generic Bell-state circuit input without submitting it.
 
     Returns a 2-qubit circuit that creates the Bell state |Φ+⟩ = (|00⟩ + |11⟩)/√2.
     This is the simplest demonstration of quantum entanglement.
 
-    The returned circuit field can be passed directly to run_sampler_tool.
-    Expected results: ~50% '00' and ~50% '11', never '01' or '10'.
+    The caller must validate, plan, approve, and submit it through the typed
+    Python control plane. ``run_sampler_tool`` is disabled.
     """
     return get_bell_state_circuit()
 
 
 @mcp.resource("circuits://ghz-state", mime_type="application/json")
 def get_ghz_state_resource() -> dict[str, Any]:
-    """Get a ready-to-run 3-qubit GHZ state (multi-qubit entanglement) circuit.
+    """Get a generic 3-qubit GHZ circuit input without submitting it.
 
     Returns a circuit that creates the GHZ state |GHZ⟩ = (|000⟩ + |111⟩)/√2.
     This generalizes the Bell state to demonstrate 3-qubit entanglement.
 
-    The returned circuit field can be passed directly to run_sampler_tool.
-    Expected results: ~50% '000' and ~50% '111', no other outcomes.
+    The caller must validate, plan, approve, and submit it through the typed
+    Python control plane. ``run_sampler_tool`` is disabled.
     """
     return get_ghz_state_circuit(3)
 
 
 @mcp.resource("circuits://random", mime_type="application/json")
 def get_random_circuit_resource() -> dict[str, Any]:
-    """Get a ready-to-run quantum random number generator circuit.
+    """Get a generic quantum-random circuit input without submitting it.
 
     Returns a 4-qubit circuit that generates truly random bits using quantum
     superposition. Each qubit is put in superposition and measured.
 
-    The returned circuit field can be passed directly to run_sampler_tool.
-    Expected results: All 16 outcomes (0000-1111) with ~6.25% probability each.
+    The caller must validate, plan, approve, and submit it through the typed
+    Python control plane. ``run_sampler_tool`` is disabled.
     """
     return get_quantum_random_circuit()
 
 
 @mcp.resource("circuits://superposition", mime_type="application/json")
 def get_superposition_resource() -> dict[str, Any]:
-    """Get the simplest possible quantum circuit - single qubit superposition.
+    """Get a generic single-qubit superposition input without submitting it.
 
     Returns a 1-qubit circuit that demonstrates quantum superposition by
     applying a Hadamard gate to create (|0⟩ + |1⟩)/√2.
 
-    The returned circuit field can be passed directly to run_sampler_tool.
-    Expected results: ~50% '0' and ~50% '1'.
+    The caller must validate, plan, approve, and submit it through the typed
+    Python control plane. ``run_sampler_tool`` is disabled.
     """
     return get_superposition_circuit()
 

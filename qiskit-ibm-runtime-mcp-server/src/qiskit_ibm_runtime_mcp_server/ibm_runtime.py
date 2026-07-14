@@ -1638,67 +1638,10 @@ async def run_estimator(
     zne_mitigation: bool = True,
     zne_noise_factors: tuple[float, ...] | None = None,
 ) -> dict[str, Any]:
-    """Run a quantum circuit using the Qiskit Runtime EstimatorV2 primitive.
+    """Return an error without submitting; retained for 0.6.x compatibility.
 
-    The Estimator primitive computes expectation values of observables for quantum circuits.
-    This is useful for variational algorithms (VQE, QAOA), quantum chemistry simulations,
-    and any application requiring expectation value estimation.
-
-    Error Mitigation:
-        This function includes built-in error mitigation techniques:
-        - Resilience Levels: Automatic error mitigation strategies
-        - ZNE (Zero Noise Extrapolation): Extrapolates to zero-noise limit
-
-    Args:
-        circuit: The quantum circuit to execute. Accepts:
-                - OpenQASM 3.0 string (recommended)
-                - OpenQASM 2.0 string (legacy, auto-detected)
-                - Base64-encoded QPY binary (for tool chaining)
-                The circuit can be parameterized (use parameter_values to bind).
-        observables: Observable(s) to measure. Accepts:
-                    - Single Pauli string (e.g., "IIXY")
-                    - List of Pauli strings (e.g., ["IIXY", "ZZII"])
-                    - List of (Pauli string, coefficient) tuples for weighted sums
-                      (e.g., [("IIXY", 0.5), ("ZZII", -0.3)])
-        parameter_values: Values for parameterized circuits. If the circuit has parameters,
-                         provide a list of float values in the same order as circuit.parameters.
-                         Optional if circuit has no parameters.
-        backend_name: Name of the IBM Quantum backend to use (e.g., 'ibm_brisbane').
-                     If not provided, uses the least busy operational backend.
-        circuit_format: Format of the circuit input. Options:
-                       - "auto" (default): Automatically detect format
-                       - "qasm3": OpenQASM 3.0/2.0 text format
-                       - "qpy": Base64-encoded QPY binary format
-        optimization_level: Qiskit transpilation optimization level (0-3). Default is 1.
-                           Higher levels may produce better circuits but take longer.
-        resilience_level: Error mitigation resilience level (0-2). Default is 1.
-                         - 0: No error mitigation
-                         - 1: Light error mitigation (default, recommended)
-                         - 2: Heavy error mitigation (slower but more accurate)
-        zne_mitigation: Enable Zero Noise Extrapolation (ZNE). Default is True.
-                       ZNE extrapolates results to the zero-noise limit for better accuracy.
-        zne_noise_factors: Noise amplification factors for ZNE. Default is (1, 1.5, 2).
-                          Only used if zne_mitigation is True.
-
-    Returns:
-        Dictionary containing:
-        - status: "success" or "error"
-        - job_id: The ID of the submitted job (can be used to check status later)
-        - backend: Name of the backend used
-        - creation_date: Job creation timestamp
-        - tags: Job tags (if any)
-        - error_mitigation: Summary of enabled error mitigation techniques
-        - message: Status message
-        - note: Information about how to retrieve results
-
-    Note:
-        This function submits the job and returns immediately. Use get_job_status_tool
-        to check completion, then get_job_results_tool to retrieve expectation values.
-
-    Example observables:
-        - Single observable: "IIXY"
-        - Multiple observables: ["IIXY", "ZZII", "XXYY"]
-        - Weighted Hamiltonian: [("IIXY", 0.5), ("ZZII", -0.3), ("XXYY", 0.2)]
+    Live Estimator execution requires a canonical ``SubmissionPlan``, a matching
+    ``ApprovalReceipt``, and ``ApprovedBatchExecutor``.
     """
     global service
     warnings.warn(_LEGACY_PRIMITIVE_WARNING, DeprecationWarning, stacklevel=2)
@@ -2021,58 +1964,10 @@ async def run_sampler(
     twirling: bool = True,
     measure_twirling: bool = True,
 ) -> dict[str, Any]:
-    """
-    Run a quantum circuit using the Qiskit Runtime SamplerV2 primitive.
+    """Return an error without submitting; retained for 0.6.x compatibility.
 
-    The Sampler primitive returns measurement outcome samples from circuit execution.
-    This is useful for algorithms that need to sample from probability distributions,
-    such as variational algorithms, quantum machine learning, and quantum simulation.
-
-    Error Mitigation:
-        This function includes built-in error mitigation techniques enabled by default:
-        - Dynamical Decoupling (DD): Suppresses decoherence during idle periods
-        - Twirling: Randomizes errors to improve measurement accuracy
-
-    Args:
-        circuit: The quantum circuit to execute. Accepts:
-                - OpenQASM 3.0 string (recommended)
-                - OpenQASM 2.0 string (legacy, auto-detected)
-                - Base64-encoded QPY binary (for tool chaining)
-                The circuit must include measurement operations to produce results.
-        backend_name: Name of the IBM Quantum backend to use (e.g., 'ibm_brisbane').
-                     If not provided, uses the least busy operational backend.
-        shots: Number of measurement shots (repetitions) per circuit. Default is 4096.
-               Maximum depends on the backend (typically 8192 or higher).
-        circuit_format: Format of the circuit input. Options:
-                       - "auto" (default): Automatically detect format
-                       - "qasm3": OpenQASM 3.0/2.0 text format
-                       - "qpy": Base64-encoded QPY binary format
-        dynamical_decoupling: Enable dynamical decoupling to suppress decoherence
-                             during idle periods in the circuit. Default is True.
-        dd_sequence: Type of dynamical decoupling sequence to use. Options:
-                    - "XX": Basic X-X sequence
-                    - "XpXm": X+/X- sequence with better noise suppression
-                    - "XY4": Most robust 4-pulse sequence (default, recommended)
-        twirling: Enable Pauli twirling on 2-qubit gates to convert coherent
-                 errors into stochastic noise. Default is True.
-        measure_twirling: Enable twirling on measurement operations for improved
-                         readout error mitigation. Default is True.
-
-    Returns:
-        Dictionary containing:
-        - status: "success" or "error"
-        - job_id: The ID of the submitted job (can be used to check status later)
-        - backend: Name of the backend used
-        - shots: Number of shots executed
-        - execution_mode: "job" (direct execution)
-        - error_mitigation: Summary of enabled error mitigation techniques
-        - message: Status message indicating job was submitted
-        - note: Information about how to retrieve results
-
-    Note:
-        This function submits the job and returns immediately. For long-running jobs,
-        use get_job_status_tool to check completion, then retrieve results separately.
-        Results include measurement outcomes as bitstrings with their counts.
+    Live Sampler execution requires a canonical ``SubmissionPlan``, a matching
+    ``ApprovalReceipt``, and ``ApprovedBatchExecutor``.
     """
     global service
     warnings.warn(_LEGACY_PRIMITIVE_WARNING, DeprecationWarning, stacklevel=2)
@@ -2094,7 +1989,7 @@ def get_bell_state_circuit() -> dict[str, Any]:
 
     Returns:
         Dictionary containing:
-        - circuit: QASM3 string ready to use with run_sampler_tool
+        - circuit: QASM3 input for the typed circuit/plan/approval boundary
         - description: Explanation of the circuit
         - expected_results: What measurement outcomes to expect
         - num_qubits: Number of qubits used
@@ -2118,7 +2013,8 @@ c = measure q;
         "expected_results": "Approximately 50% '00' and 50% '11' outcomes. "
         "Never '01' or '10' due to entanglement.",
         "num_qubits": 2,
-        "usage": "Pass the 'circuit' field directly to run_sampler_tool",
+        "usage": "Validate and ingest the circuit, then create a bounded plan and approval. "
+        "The MCP run_sampler_tool is disabled.",
     }
 
 
@@ -2136,7 +2032,7 @@ def get_ghz_state_circuit(num_qubits: int = 3) -> dict[str, Any]:
 
     Returns:
         Dictionary containing:
-        - circuit: QASM3 string ready to use with run_sampler_tool
+        - circuit: QASM3 input for the typed circuit/plan/approval boundary
         - description: Explanation of the circuit
         - expected_results: What measurement outcomes to expect
         - num_qubits: Number of qubits used
@@ -2180,7 +2076,8 @@ def get_ghz_state_circuit(num_qubits: int = 3) -> dict[str, Any]:
         "expected_results": f"Approximately 50% '{all_zeros}' and 50% '{all_ones}' outcomes. "
         "No other bitstrings should appear due to entanglement.",
         "num_qubits": num_qubits,
-        "usage": "Pass the 'circuit' field directly to run_sampler_tool",
+        "usage": "Validate and ingest the circuit, then create a bounded plan and approval. "
+        "The MCP run_sampler_tool is disabled.",
     }
 
 
@@ -2193,7 +2090,7 @@ def get_quantum_random_circuit() -> dict[str, Any]:
 
     Returns:
         Dictionary containing:
-        - circuit: QASM3 string ready to use with run_sampler_tool
+        - circuit: QASM3 input for the typed circuit/plan/approval boundary
         - description: Explanation of the circuit
         - expected_results: What measurement outcomes to expect
         - num_qubits: Number of qubits used
@@ -2220,8 +2117,8 @@ c = measure q;
         "expected_results": "All 16 possible 4-bit outcomes (0000 to 1111) with roughly equal probability. "
         "Each outcome should appear about 6.25% of the time.",
         "num_qubits": 4,
-        "usage": "Pass the 'circuit' field directly to run_sampler_tool. "
-        "Use multiple shots to generate many random numbers.",
+        "usage": "Validate and ingest the circuit, then create a bounded plan and approval. "
+        "The MCP run_sampler_tool is disabled.",
     }
 
 
@@ -2233,7 +2130,7 @@ def get_superposition_circuit() -> dict[str, Any]:
 
     Returns:
         Dictionary containing:
-        - circuit: QASM3 string ready to use with run_sampler_tool
+        - circuit: QASM3 input for the typed circuit/plan/approval boundary
         - description: Explanation of the circuit
         - expected_results: What measurement outcomes to expect
         - num_qubits: Number of qubits used
@@ -2255,8 +2152,8 @@ c = measure q;
         "an equal superposition (|0⟩ + |1⟩)/√2.",
         "expected_results": "Approximately 50% '0' and 50% '1' outcomes.",
         "num_qubits": 1,
-        "usage": "Pass the 'circuit' field directly to run_sampler_tool. "
-        "This is the simplest possible quantum experiment.",
+        "usage": "Validate and ingest the circuit, then create a bounded plan and approval. "
+        "The MCP run_sampler_tool is disabled.",
     }
 
 

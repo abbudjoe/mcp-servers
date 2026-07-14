@@ -23,6 +23,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 
 import pytest
+import qiskit
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qpy
 from qiskit.circuit import Gate, Parameter
 from qiskit.circuit.library import RXGate, XGate
@@ -112,8 +113,8 @@ def test_qpy_ingestion_preserves_exact_bytes_and_rich_qiskit_state(
     assert sink.get_bytes(ingested.artifact.artifact) == raw
     assert ingested.artifact.circuit_hash == content_id(raw)
     assert ingested.artifact.artifact.artifact_id == content_id(raw)
-    assert ingested.artifact.qiskit_version == "2.4.2"
-    assert ingested.artifact.reader_qiskit_version == "2.4.2"
+    assert ingested.artifact.qiskit_version == qiskit.__version__
+    assert ingested.artifact.reader_qiskit_version == qiskit.__version__
     assert ingested.artifact.qpy_version == qpy.QPY_VERSION
     assert ingested.artifact.qpy_symbolic_encoding in {"p", "e"}
     assert ingested.artifact.parameter_names == ["theta"]
@@ -265,7 +266,7 @@ def test_explicit_transpile_emits_new_qpy_with_complete_provenance(
         "optimization_level": 1,
         "seed_transpiler": 23,
     }
-    assert provenance.software_versions["qiskit"] == "2.4.2"
+    assert provenance.software_versions["qiskit"] == qiskit.__version__
     assert sink.get_bytes(result.artifact.artifact)
 
 
