@@ -22,12 +22,9 @@ from datetime import datetime
 from typing import Any, Literal
 
 from qiskit.primitives.containers import BitArray, DataBin
-from qiskit.quantum_info import SparsePauliOp
-from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
-from qiskit_ibm_runtime import EstimatorV2, QiskitRuntimeService, SamplerV2
+from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit_ibm_runtime.fake_provider import FakeProviderForBackendV2
-from qiskit_ibm_runtime.options import EstimatorOptions, SamplerOptions
-from qiskit_mcp_server.circuit_serialization import CircuitFormat, load_circuit
+from qiskit_mcp_server.circuit_serialization import CircuitFormat
 
 from qiskit_ibm_runtime_mcp_server.core import LocalArtifactCAS, parse_primitive_result
 from qiskit_ibm_runtime_mcp_server.core.snapshots import (
@@ -1705,143 +1702,13 @@ async def run_estimator(
     """
     global service
     warnings.warn(_LEGACY_PRIMITIVE_WARNING, DeprecationWarning, stacklevel=2)
-
-    # Validate inputs before any network calls
-    if not 0 <= optimization_level <= 3:
-        return {
-            "status": "error",
-            "message": f"optimization_level must be between 0 and 3, got {optimization_level}",
-        }
-    if not 0 <= resilience_level <= 2:
-        return {
-            "status": "error",
-            "message": f"resilience_level must be between 0 and 2, got {resilience_level}",
-        }
-
-    try:
-        if service is None:
-            service = initialize_service()
-
-        # Load the circuit using the shared serialization module
-        load_result = load_circuit(circuit, circuit_format)
-        if load_result["status"] == "error":
-            return {"status": "error", "message": load_result["message"]}
-        qc = load_result["circuit"]
-
-        # Get the backend
-        backend, backend_error = _get_backend(service, backend_name)
-        if backend_error:
-            return {"status": "error", "message": backend_error}
-        assert backend is not None  # Type narrowing for mypy  # nosec B101
-
-        # Preserve the legacy documented distinction: a string list is a vector of
-        # separate observables, while weighted pairs are one Hamiltonian.
-        try:
-            if isinstance(observables, str):
-                parsed_observables: SparsePauliOp | list[SparsePauliOp] = SparsePauliOp(
-                    observables
-                )
-            elif isinstance(observables, list):
-                if not observables:
-                    return {
-                        "status": "error",
-                        "message": "observables list cannot be empty",
-                    }
-
-                # Check if it's a list of tuples/lists (weighted) or strings
-                # Note: JSON serialization converts tuples to lists, so we check both
-                if isinstance(observables[0], (tuple, list)):
-                    parsed_observables = SparsePauliOp.from_list(observables)
-                else:
-                    parsed_observables = [SparsePauliOp(obs) for obs in observables]
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Failed to parse observables: {e!s}",
-            }
-
-        # Transpile circuit to backend's instruction set
-        pm = generate_preset_pass_manager(
-            backend=backend, optimization_level=optimization_level
-        )
-        isa_circuit = pm.run(qc)
-
-        # Apply layout to observables
-        isa_observables: SparsePauliOp | list[SparsePauliOp]
-        if isinstance(parsed_observables, list):
-            isa_observables = [
-                observable.apply_layout(isa_circuit.layout)
-                for observable in parsed_observables
-            ]
-        else:
-            isa_observables = parsed_observables.apply_layout(isa_circuit.layout)
-
-        # Configure error mitigation options
-        options = EstimatorOptions()
-        options.resilience_level = resilience_level
-
-        # Zero Noise Extrapolation (ZNE)
-        if zne_mitigation and resilience_level > 0:
-            options.resilience.zne_mitigation = True
-            if zne_noise_factors is not None:
-                options.resilience.zne.noise_factors = zne_noise_factors
-
-        # Build error mitigation summary for response
-        error_mitigation: dict[str, Any] = {
-            "resilience_level": resilience_level,
-            "zne_mitigation": {
-                "enabled": zne_mitigation and resilience_level > 0,
-                "noise_factors": (
-                    list(zne_noise_factors) if zne_noise_factors else [1, 1.5, 2]
-                ),
-            },
-        }
-
-        # Create EstimatorV2 with options and submit job
-        estimator = EstimatorV2(mode=backend, options=options)
-
-        # Build PUB (Primitive Unified Bloc)
-        # Type: tuple[QuantumCircuit, SparsePauliOp] | tuple[QuantumCircuit, SparsePauliOp, list[list[float]]]
-        pub: tuple[Any, ...]
-        if parameter_values is not None:
-            # A flat vector binds one deterministic circuit.parameters location.
-            pub = (isa_circuit, isa_observables, parameter_values)
-        else:
-            # Non-parameterized circuit
-            pub = (isa_circuit, isa_observables)
-
-        job = estimator.run([pub])
-
-        # Get error_message - it might be a method or an attribute
-        error_msg = getattr(job, "error_message", None)
-        if callable(error_msg):
-            error_msg = error_msg()
-
-        # Get tags safely
-        tags = getattr(job, "tags", None)
-        if tags is None:
-            tags = []
-        else:
-            tags = list(tags) if not isinstance(tags, list) else tags
-
-        return {
-            "status": "success",
-            "job_id": job.job_id(),
-            "backend": backend.name,
-            "creation_date": str(getattr(job, "creation_date", "Unknown")),
-            "tags": tags,
-            "error_message": error_msg,
-            "error_mitigation": error_mitigation,
-            "message": f"Estimator job submitted successfully to {backend.name}",
-            "note": "Use get_job_status_tool with the job_id to check completion. "
-            "Results will contain expectation values for the specified observables.",
-            "migration_warning": _LEGACY_PRIMITIVE_WARNING,
-            "pub_ids": ["legacy-pub-0"],
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to run estimator: {e}")
-        return {"status": "error", "message": f"Failed to run estimator: {e!s}"}
+    return {
+        "status": "error",
+        "message": (
+            "Legacy direct Estimator submission is disabled: create a canonical "
+            "SubmissionPlan and use ApprovedBatchExecutor with a bound ApprovalReceipt"
+        ),
+    }
 
 
 def _clamp(value: int, min_val: int, max_val: int) -> int:
@@ -2209,72 +2076,13 @@ async def run_sampler(
     """
     global service
     warnings.warn(_LEGACY_PRIMITIVE_WARNING, DeprecationWarning, stacklevel=2)
-
-    # Validate inputs before any network calls
-    if shots < 1:
-        return {"status": "error", "message": "shots must be at least 1"}
-
-    try:
-        if service is None:
-            service = initialize_service()
-
-        # Load the circuit using the shared serialization module
-        load_result = load_circuit(circuit, circuit_format)
-        if load_result["status"] == "error":
-            return {"status": "error", "message": load_result["message"]}
-        qc = load_result["circuit"]
-
-        # Get the backend
-        backend, backend_error = _get_backend(service, backend_name)
-        if backend_error:
-            return {"status": "error", "message": backend_error}
-        assert backend is not None  # Type narrowing for mypy  # nosec B101
-
-        # Configure error mitigation options
-        options = SamplerOptions()
-
-        # Dynamical Decoupling - suppresses decoherence during idle periods
-        options.dynamical_decoupling.enable = dynamical_decoupling
-        if dynamical_decoupling:
-            options.dynamical_decoupling.sequence_type = dd_sequence
-
-        # Twirling - randomizes errors to convert coherent errors to stochastic noise
-        options.twirling.enable_gates = twirling
-        options.twirling.enable_measure = measure_twirling
-
-        # Build error mitigation summary for response
-        error_mitigation: dict[str, Any] = {
-            "dynamical_decoupling": {
-                "enabled": dynamical_decoupling,
-                "sequence": dd_sequence if dynamical_decoupling else None,
-            },
-            "twirling": {
-                "gates_enabled": twirling,
-                "measure_enabled": measure_twirling,
-            },
-        }
-
-        # Create SamplerV2 with options and run
-        sampler = SamplerV2(mode=backend, options=options)
-        job = sampler.run([qc], shots=shots)
-
-        return {
-            "status": "success",
-            "job_id": job.job_id(),
-            "backend": backend.name,
-            "shots": shots,
-            "execution_mode": "job",
-            "error_mitigation": error_mitigation,
-            "message": f"Sampler job submitted successfully to {backend.name}",
-            "note": "Use get_job_status_tool with the job_id to check completion. "
-            "Results will contain measurement bitstrings and their counts.",
-            "migration_warning": _LEGACY_PRIMITIVE_WARNING,
-            "pub_ids": ["legacy-pub-0"],
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to run sampler: {e}")
-        return {"status": "error", "message": f"Failed to run sampler: {e!s}"}
+    return {
+        "status": "error",
+        "message": (
+            "Legacy direct Sampler submission is disabled: create a canonical "
+            "SubmissionPlan and use ApprovedBatchExecutor with a bound ApprovalReceipt"
+        ),
+    }
 
 
 def get_bell_state_circuit() -> dict[str, Any]:

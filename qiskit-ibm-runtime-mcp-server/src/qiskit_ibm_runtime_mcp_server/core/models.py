@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any, Literal
 
 from pydantic import (
@@ -487,19 +488,54 @@ class SubmissionPartition(VersionedContractModel):
     maximum_execution_seconds: PositiveFloat | None = None
 
 
+class PubShape(VersionedContractModel):
+    """Resolved Primitive V2 broadcast and execution cardinality for one PUB."""
+
+    pub_id: str = Field(min_length=1)
+    parameter_shape: list[NonNegativeInt]
+    observable_shape: list[NonNegativeInt] | None
+    result_shape: list[NonNegativeInt]
+    circuit_executions: PositiveInt
+
+
+class ScheduledPubEstimate(VersionedContractModel):
+    """Auditable locked-method QPU estimate for one resolved PUB."""
+
+    pub_id: str = Field(min_length=1)
+    scheduled_circuit_seconds: PositiveFloat
+    conservative_cycle_seconds: PositiveFloat
+    circuit_executions: PositiveInt
+    physical_circuit_executions: PositiveInt
+    repetitions_per_execution: PositiveInt
+    treatment_multiplier: PositiveFloat
+    estimated_qpu_seconds: PositiveFloat
+
+
 class SubmissionPlan(VersionedContractModel):
-    """Immutable-by-hash resolved dry-run submission plan."""
+    """Complete immutable-by-hash dry-run plan for one bounded submission."""
 
     plan_id: str = Field(min_length=1)
+    submission_key: str = Field(min_length=1, max_length=256)
     plan_hash: Sha256Id = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    policy_hash: Sha256Id = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     instance_id: str = Field(min_length=1)
+    instance_plan_type: Literal["open", "paid"]
     backend_name: str = Field(min_length=1)
+    target_hash: Sha256Id = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    compiler_target_hash: Sha256Id = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     primitive: Literal["sampler", "estimator"]
     pubs: list[SamplerPubSpec | EstimatorPubSpec] = Field(min_length=1)
+    pub_shapes: list[PubShape] = Field(min_length=1)
     resolved_options: dict[str, Any]
+    treatments: list[str]
     partitions: list[SubmissionPartition] = Field(min_length=1)
+    scheduled_estimates: list[ScheduledPubEstimate] = Field(min_length=1)
+    total_circuit_executions: PositiveInt
     estimated_qpu_seconds: NonNegativeFloat
     maximum_execution_seconds: PositiveFloat
+    estimation_method: str = Field(min_length=1)
+    estimation_version: str = Field(min_length=1)
+    estimation_software_versions: dict[str, str]
 
     @model_validator(mode="after")
     def _pub_types_match_primitive(self) -> SubmissionPlan:
@@ -518,24 +554,121 @@ class SubmissionPlan(VersionedContractModel):
         ]
         if sorted(partitioned_ids) != sorted(pub_ids):
             raise ValueError("partitions must contain every plan PUB exactly once")
+        if [shape.pub_id for shape in self.pub_shapes] != pub_ids:
+            raise ValueError("pub_shapes must preserve exact plan PUB order")
+        if [estimate.pub_id for estimate in self.scheduled_estimates] != pub_ids:
+            raise ValueError("scheduled_estimates must preserve exact plan PUB order")
+        if any(
+            estimate.circuit_executions != shape.circuit_executions
+            for estimate, shape in zip(
+                self.scheduled_estimates, self.pub_shapes, strict=True
+            )
+        ):
+            raise ValueError(
+                "scheduled estimate circuit executions must match resolved PUB shapes"
+            )
+        if sum(
+            estimate.physical_circuit_executions
+            for estimate in self.scheduled_estimates
+        ) != int(self.total_circuit_executions):
+            raise ValueError(
+                "total_circuit_executions must sum scheduled physical circuits"
+            )
+        if not math.isclose(
+            math.fsum(
+                float(estimate.estimated_qpu_seconds)
+                for estimate in self.scheduled_estimates
+            ),
+            float(self.estimated_qpu_seconds),
+            rel_tol=1e-12,
+            abs_tol=1e-12,
+        ):
+            raise ValueError("estimated QPU seconds must sum scheduled PUB estimates")
+        if len(self.treatments) != len(set(self.treatments)):
+            raise ValueError("treatments must be unique")
         return self
 
 
-class ApprovalReceipt(VersionedContractModel):
+class BudgetPolicy(FrozenVersionedContractModel):
+    """Fail-closed planning and live-execution policy."""
+
+    dry_run: bool = True
+    allow_live_qpu: bool = False
+    allow_paid_fallback: bool = False
+    max_estimated_qpu_seconds: PositiveFloat
+    max_execution_seconds: PositiveInt
+    max_jobs: PositiveInt
+    max_pubs: PositiveInt
+    max_circuits: PositiveInt
+    max_partitions: PositiveInt
+    max_pubs_per_job: PositiveInt
+    max_shots_per_pub: PositiveInt
+    batch_max_time_seconds: PositiveInt
+    ttl_margin_seconds: NonNegativeInt = LOCKED_BATCH_INTERACTIVE_TTL_SECONDS
+    approval_ttl_seconds: PositiveInt
+    allowed_instance_ids: tuple[str, ...]
+    allowed_paid_instance_ids: tuple[str, ...] = ()
+    allowed_backends: tuple[str, ...]
+    permitted_primitives: tuple[Literal["sampler", "estimator"], ...]
+    permitted_treatments: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _policy_is_bounded_and_explicit(self) -> BudgetPolicy:
+        for name, values in (
+            ("allowed_instance_ids", self.allowed_instance_ids),
+            ("allowed_backends", self.allowed_backends),
+            ("permitted_primitives", self.permitted_primitives),
+        ):
+            if not values:
+                raise ValueError(f"{name} must not be empty")
+            if len(values) != len(set(values)):
+                raise ValueError(f"{name} must not contain duplicates")
+        if len(self.permitted_treatments) != len(set(self.permitted_treatments)):
+            raise ValueError("permitted_treatments must not contain duplicates")
+        if len(self.allowed_paid_instance_ids) != len(
+            set(self.allowed_paid_instance_ids)
+        ):
+            raise ValueError("allowed_paid_instance_ids must not contain duplicates")
+        if any(
+            instance not in self.allowed_instance_ids
+            for instance in self.allowed_paid_instance_ids
+        ):
+            raise ValueError(
+                "allowed_paid_instance_ids must be a subset of allowed_instance_ids"
+            )
+        if self.max_pubs_per_job > self.max_pubs:
+            raise ValueError("max_pubs_per_job cannot exceed max_pubs")
+        BatchExecutionLimits(
+            schema_version="1.0",
+            max_jobs=self.max_jobs,
+            max_pubs_per_job=self.max_pubs_per_job,
+            max_estimated_qpu_seconds_per_job=self.max_estimated_qpu_seconds,
+            max_execution_seconds_per_job=self.max_execution_seconds,
+            batch_max_time_seconds=self.batch_max_time_seconds,
+            ttl_margin_seconds=self.ttl_margin_seconds,
+        )
+        return self
+
+
+class ApprovalReceipt(FrozenVersionedContractModel):
     """Approval bound to an exact plan hash and explicit resource allowlists."""
 
     plan_hash: Sha256Id = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     approved_at: AwareDatetime
     expires_at: AwareDatetime
     max_qpu_seconds: PositiveFloat
-    allowed_instance_ids: list[str] = Field(min_length=1)
-    allowed_backends: list[str] = Field(min_length=1)
+    allowed_instance_ids: tuple[str, ...] = Field(min_length=1)
+    allowed_backends: tuple[str, ...] = Field(min_length=1)
     allow_paid_fallback: bool = False
 
     @model_validator(mode="after")
     def _expiry_follows_approval(self) -> ApprovalReceipt:
         if self.expires_at <= self.approved_at:
             raise ValueError("expires_at must be later than approved_at")
+        if len(self.allowed_instance_ids) != len(set(self.allowed_instance_ids)):
+            raise ValueError("allowed_instance_ids must not contain duplicates")
+        if len(self.allowed_backends) != len(set(self.allowed_backends)):
+            raise ValueError("allowed_backends must not contain duplicates")
         return self
 
 
@@ -688,6 +821,31 @@ class BatchSubmissionReceipt(FrozenVersionedContractModel):
         if self.completed_at < self.reserved_at:
             raise ValueError("completed_at cannot precede reserved_at")
         return self
+
+
+class ApprovedSubmission(FrozenVersionedContractModel):
+    """Immutable evidence returned after the approval boundary accepts a plan."""
+
+    plan_hash: Sha256Id = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    estimated_qpu_seconds: NonNegativeFloat
+    approval_max_qpu_seconds: PositiveFloat
+    receipt: BatchSubmissionReceipt
+
+    @model_validator(mode="after")
+    def _receipt_matches_plan(self) -> ApprovedSubmission:
+        if self.receipt.plan_hash != self.plan_hash:
+            raise ValueError("approved submission receipt must match plan_hash")
+        return self
+
+
+class UsageReconciliation(FrozenVersionedContractModel):
+    """Estimated, approved, and actual usage kept together for callers."""
+
+    plan_hash: Sha256Id = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    estimated_qpu_seconds: NonNegativeFloat
+    approval_max_qpu_seconds: PositiveFloat
+    actual_qpu_seconds: NonNegativeFloat | None
+    batch_usage: BatchUsage
 
 
 class RecoveredSubmissionStatus(FrozenVersionedContractModel):
@@ -865,7 +1023,10 @@ PUBLIC_MODELS: tuple[type[BaseModel], ...] = (
     SamplerPubSpec,
     EstimatorPubSpec,
     SubmissionPartition,
+    PubShape,
+    ScheduledPubEstimate,
     SubmissionPlan,
+    BudgetPolicy,
     ApprovalReceipt,
     RuntimeUsage,
     BatchExecutionLimits,
@@ -878,6 +1039,8 @@ PUBLIC_MODELS: tuple[type[BaseModel], ...] = (
     BatchJobReceipt,
     BatchSubmissionFailure,
     BatchSubmissionReceipt,
+    ApprovedSubmission,
+    UsageReconciliation,
     RecoveredSubmissionStatus,
     SubmissionKeyStatus,
     SamplerRegisterResult,

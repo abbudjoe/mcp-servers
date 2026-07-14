@@ -46,8 +46,10 @@ from qiskit_ibm_runtime_mcp_server.core import (
     parse_primitive_result,
     prepare_estimator_pubs,
     prepare_sampler_pubs,
-    submit_estimator_pubs,
-    submit_sampler_pubs,
+)
+from qiskit_ibm_runtime_mcp_server.core.primitives import (
+    _submit_estimator_pubs_unchecked,
+    _submit_sampler_pubs_unchecked,
 )
 
 
@@ -121,7 +123,7 @@ def test_sampler_scalar_vector_and_multidimensional_pubs_are_coerced_in_order(
     assert [pub.shots for pub in prepared] == [16, 32, 64]
 
     runner = RecordingPrimitive()
-    submitted = submit_sampler_pubs(runner, specs, sink=sink)
+    submitted = _submit_sampler_pubs_unchecked(runner, specs, sink=sink)
     assert len(runner.calls) == 1
     assert runner.calls[0][0].parameter_values.as_array().tolist() == [0.1, 0.2]
     assert submitted.pub_ids == ("scalar", "vector", "matrix")
@@ -181,7 +183,7 @@ def test_estimator_separate_observables_and_hamiltonian_keep_distinct_shapes(
     assert prepared[1].observables.shape == ()
 
     runner = RecordingPrimitive()
-    submitted = submit_estimator_pubs(runner, specs, sink=sink)
+    submitted = _submit_estimator_pubs_unchecked(runner, specs, sink=sink)
     assert len(runner.calls) == 1
     assert submitted.pub_ids == ("separate", "hamiltonian", "broadcast-matrix")
     assert submitted.pub_shapes == ((2,), (), (2, 2))
