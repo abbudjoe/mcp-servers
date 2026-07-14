@@ -51,6 +51,33 @@
       "title": "ArtifactRef",
       "type": "object"
     },
+    "InlineJsonValue": {
+      "additionalProperties": true,
+      "description": "Explicit inline branch for values that may instead be artifact-backed.",
+      "properties": {
+        "kind": {
+          "const": "inline_json",
+          "title": "Kind",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "schema_version",
+        "kind",
+        "value"
+      ],
+      "title": "InlineJsonValue",
+      "type": "object"
+    },
+    "JsonValue": {},
     "SamplerRegisterResult": {
       "additionalProperties": true,
       "description": "One named classical register returned in a Sampler DataBin.",
@@ -58,48 +85,36 @@
         "bitstrings_by_location": {
           "anyOf": [
             {
-              "items": {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              "type": "array"
+              "$ref": "#/$defs/InlineJsonValue"
             },
             {
               "$ref": "#/$defs/ArtifactRef"
-            },
-            {
-              "type": "null"
             }
           ],
-          "default": null,
           "title": "Bitstrings By Location"
         },
         "counts_by_location": {
           "anyOf": [
             {
-              "items": {
-                "additionalProperties": {
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "type": "object"
-              },
-              "type": "array"
+              "$ref": "#/$defs/InlineJsonValue"
             },
             {
               "$ref": "#/$defs/ArtifactRef"
-            },
-            {
-              "type": "null"
             }
           ],
-          "default": null,
           "title": "Counts By Location"
         },
         "extensions": {
-          "additionalProperties": true,
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/InlineJsonValue"
+              },
+              {
+                "$ref": "#/$defs/ArtifactRef"
+              }
+            ]
+          },
           "title": "Extensions",
           "type": "object"
         },
@@ -113,6 +128,25 @@
           "title": "Num Shots",
           "type": "integer"
         },
+        "packed_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InlineJsonValue"
+            },
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            }
+          ],
+          "title": "Packed Bytes"
+        },
+        "packed_shape": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Packed Shape",
+          "type": "array"
+        },
         "pub_shape": {
           "items": {
             "minimum": 0,
@@ -120,6 +154,17 @@
           },
           "title": "Pub Shape",
           "type": "array"
+        },
+        "quasi_distributions_by_location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InlineJsonValue"
+            },
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            }
+          ],
+          "title": "Quasi Distributions By Location"
         },
         "register_name": {
           "minLength": 1,
@@ -137,7 +182,12 @@
         "register_name",
         "pub_shape",
         "num_shots",
-        "num_bits"
+        "num_bits",
+        "packed_shape",
+        "packed_bytes",
+        "counts_by_location",
+        "bitstrings_by_location",
+        "quasi_distributions_by_location"
       ],
       "title": "SamplerRegisterResult",
       "type": "object"
@@ -148,8 +198,25 @@
   "additionalProperties": true,
   "description": "Ordered result for one Sampler PUB.",
   "properties": {
+    "data_bin_shape": {
+      "items": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Data Bin Shape",
+      "type": "array"
+    },
     "extensions": {
-      "additionalProperties": true,
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/InlineJsonValue"
+          },
+          {
+            "$ref": "#/$defs/ArtifactRef"
+          }
+        ]
+      },
       "title": "Extensions",
       "type": "object"
     },
@@ -185,6 +252,7 @@
     "schema_version",
     "pub_id",
     "pub_index",
+    "data_bin_shape",
     "registers"
   ],
   "title": "SamplerPubResult",

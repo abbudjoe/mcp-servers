@@ -2,15 +2,18 @@
   "$defs": {
     "JsonValue": {}
   },
-  "$id": "https://qiskit.org/schemas/runtime-research/v1.0/pauli-observables.json",
+  "$id": "https://qiskit.org/schemas/runtime-research/v1.0/parameter-bindings.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": true,
-  "description": "A broadcast collection of separate Pauli observables.",
+  "description": "Deterministic named parameter values with an explicit broadcast shape.",
   "properties": {
-    "kind": {
-      "const": "pauli_observables",
-      "title": "Kind",
-      "type": "string"
+    "parameter_names": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Parameter Names",
+      "type": "array"
     },
     "schema_version": {
       "const": "1.0",
@@ -31,11 +34,11 @@
   },
   "required": [
     "schema_version",
-    "kind",
+    "parameter_names",
     "shape",
     "values"
   ],
-  "title": "PauliObservables",
+  "title": "ParameterBindings",
   "type": "object",
   "x-schema-version": "1.0"
 }

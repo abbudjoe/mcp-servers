@@ -79,119 +79,48 @@
     },
     "JsonValue": {}
   },
-  "$id": "https://qiskit.org/schemas/runtime-research/v1.0/sampler-register-result.json",
+  "$id": "https://qiskit.org/schemas/runtime-research/v1.0/shaped-result-value.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": true,
-  "description": "One named classical register returned in a Sampler DataBin.",
+  "description": "Array/scalar result whose shape survives inline and artifact storage.",
   "properties": {
-    "bitstrings_by_location": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/InlineJsonValue"
-        },
-        {
-          "$ref": "#/$defs/ArtifactRef"
-        }
-      ],
-      "title": "Bitstrings By Location"
-    },
-    "counts_by_location": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/InlineJsonValue"
-        },
-        {
-          "$ref": "#/$defs/ArtifactRef"
-        }
-      ],
-      "title": "Counts By Location"
-    },
-    "extensions": {
-      "additionalProperties": {
-        "anyOf": [
-          {
-            "$ref": "#/$defs/InlineJsonValue"
-          },
-          {
-            "$ref": "#/$defs/ArtifactRef"
-          }
-        ]
-      },
-      "title": "Extensions",
-      "type": "object"
-    },
-    "num_bits": {
-      "exclusiveMinimum": 0,
-      "title": "Num Bits",
-      "type": "integer"
-    },
-    "num_shots": {
-      "exclusiveMinimum": 0,
-      "title": "Num Shots",
-      "type": "integer"
-    },
-    "packed_bytes": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/InlineJsonValue"
-        },
-        {
-          "$ref": "#/$defs/ArtifactRef"
-        }
-      ],
-      "title": "Packed Bytes"
-    },
-    "packed_shape": {
-      "items": {
-        "minimum": 0,
-        "type": "integer"
-      },
-      "title": "Packed Shape",
-      "type": "array"
-    },
-    "pub_shape": {
-      "items": {
-        "minimum": 0,
-        "type": "integer"
-      },
-      "title": "Pub Shape",
-      "type": "array"
-    },
-    "quasi_distributions_by_location": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/InlineJsonValue"
-        },
-        {
-          "$ref": "#/$defs/ArtifactRef"
-        }
-      ],
-      "title": "Quasi Distributions By Location"
-    },
-    "register_name": {
+    "dtype": {
       "minLength": 1,
-      "title": "Register Name",
+      "title": "Dtype",
       "type": "string"
     },
     "schema_version": {
       "const": "1.0",
       "title": "Schema Version",
       "type": "string"
+    },
+    "shape": {
+      "items": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Shape",
+      "type": "array"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/InlineJsonValue"
+        },
+        {
+          "$ref": "#/$defs/ArtifactRef"
+        }
+      ],
+      "title": "Value"
     }
   },
   "required": [
     "schema_version",
-    "register_name",
-    "pub_shape",
-    "num_shots",
-    "num_bits",
-    "packed_shape",
-    "packed_bytes",
-    "counts_by_location",
-    "bitstrings_by_location",
-    "quasi_distributions_by_location"
+    "shape",
+    "dtype",
+    "value"
   ],
-  "title": "SamplerRegisterResult",
+  "title": "ShapedResultValue",
   "type": "object",
   "x-schema-version": "1.0"
 }

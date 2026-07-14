@@ -43,12 +43,14 @@ from qiskit_ibm_runtime_mcp_server.core.models import (
     EstimatorPubSpec,
     InlineJsonValue,
     PauliObservables,
+    ParameterBindings,
     PrimitiveResultEnvelope,
     PUBLIC_MODELS,
     RuntimeUsage,
     SamplerPubResult,
     SamplerPubSpec,
     SamplerRegisterResult,
+    ShapedResultValue,
     SparsePauliHamiltonian,
     SubmissionPartition,
     SubmissionPlan,
@@ -117,11 +119,17 @@ def _circuit() -> CircuitArtifact:
 
 
 def _public_instances() -> list[object]:
+    bindings = ParameterBindings(
+        schema_version="1.0",
+        parameter_names=["theta"],
+        shape=[1],
+        values=[[0.25]],
+    )
     sampler_pub = SamplerPubSpec(
         schema_version="1.0",
         pub_id="sampler-0",
         circuit=_circuit(),
-        parameter_values=[[0.25]],
+        parameter_values=bindings,
         shots=100,
     )
     estimator_pub = EstimatorPubSpec(
@@ -129,9 +137,12 @@ def _public_instances() -> list[object]:
         pub_id="estimator-0",
         circuit=_circuit(),
         observables=PauliObservables(
-            schema_version="1.0", kind="pauli_observables", values=["ZZ", "XX"]
+            schema_version="1.0",
+            kind="pauli_observables",
+            shape=[2],
+            values=["ZZ", "XX"],
         ),
-        parameter_values=[[0.25]],
+        parameter_values=bindings,
         precision=0.01,
     )
     partition = SubmissionPartition(
@@ -143,25 +154,56 @@ def _public_instances() -> list[object]:
         pub_shape=[],
         num_shots=100,
         num_bits=2,
-        counts_by_location=[{"00": 50, "11": 50}],
+        packed_shape=[100, 1],
+        packed_bytes=InlineJsonValue(
+            schema_version="1.0", kind="inline_json", value=[[0]] * 100
+        ),
+        counts_by_location=InlineJsonValue(
+            schema_version="1.0",
+            kind="inline_json",
+            value=[{"00": 50, "11": 50}],
+        ),
+        bitstrings_by_location=InlineJsonValue(
+            schema_version="1.0",
+            kind="inline_json",
+            value=[["00"] * 50 + ["11"] * 50],
+        ),
+        quasi_distributions_by_location=InlineJsonValue(
+            schema_version="1.0",
+            kind="inline_json",
+            value=[{"00": 0.5, "11": 0.5}],
+        ),
     )
     sampler_result = SamplerPubResult(
         schema_version="1.0",
         pub_id="sampler-0",
         pub_index=0,
+        data_bin_shape=[],
         registers=[sampler_register],
+    )
+    expectation_values = ShapedResultValue(
+        schema_version="1.0",
+        shape=[2],
+        dtype="float64",
+        value=InlineJsonValue(
+            schema_version="1.0",
+            kind="inline_json",
+            value=np.array([0.5, -0.25]),
+        ),
     )
     estimator_result = EstimatorPubResult(
         schema_version="1.0",
         pub_id="estimator-0",
         pub_index=0,
-        expectation_values=InlineJsonValue(
+        data_bin_shape=[2],
+        expectation_values=expectation_values,
+        standard_deviations=ShapedResultValue(
             schema_version="1.0",
-            kind="inline_json",
-            value=np.array([0.5, -0.25]),
-        ),
-        standard_deviations=InlineJsonValue(
-            schema_version="1.0", kind="inline_json", value=np.array([0.1, 0.2])
+            shape=[2],
+            dtype="float64",
+            value=InlineJsonValue(
+                schema_version="1.0", kind="inline_json", value=np.array([0.1, 0.2])
+            ),
         ),
     )
     usage = RuntimeUsage(schema_version="1.0", quantum_seconds=1.25, job_id="job-1")
@@ -232,7 +274,10 @@ def _public_instances() -> list[object]:
             software_versions={"qiskit": "2.4.2"},
         ),
         PauliObservables(
-            schema_version="1.0", kind="pauli_observables", values=["ZZ", "XX"]
+            schema_version="1.0",
+            kind="pauli_observables",
+            shape=[2],
+            values=["ZZ", "XX"],
         ),
         SparsePauliHamiltonian(
             schema_version="1.0",
@@ -241,6 +286,7 @@ def _public_instances() -> list[object]:
         ),
         sampler_pub,
         estimator_pub,
+        bindings,
         partition,
         SubmissionPlan(
             schema_version="1.0",
@@ -270,6 +316,7 @@ def _public_instances() -> list[object]:
         InlineJsonValue(
             schema_version="1.0", kind="inline_json", value={"future": [1, 2]}
         ),
+        expectation_values,
         estimator_result,
         PrimitiveResultEnvelope(
             schema_version="1.0",
@@ -501,9 +548,17 @@ def test_plan_rejects_primitive_mismatch_and_partition_drift() -> None:
         pub_id="estimator-0",
         circuit=_circuit(),
         observables=PauliObservables(
-            schema_version="1.0", kind="pauli_observables", values=["ZZ"]
+            schema_version="1.0",
+            kind="pauli_observables",
+            shape=[1],
+            values=["ZZ"],
         ),
-        parameter_values=None,
+        parameter_values=ParameterBindings(
+            schema_version="1.0",
+            parameter_names=["theta"],
+            shape=[],
+            values=[0.25],
+        ),
         precision=None,
     )
     with pytest.raises(ValidationError, match="matching PUB specs"):
@@ -531,15 +586,23 @@ def test_estimator_artifact_values_round_trip_as_typed_references() -> None:
         schema_version="1.0",
         pub_id="estimator-0",
         pub_index=0,
-        expectation_values=_artifact_ref(),
-        standard_deviations=InlineJsonValue(
-            schema_version="1.0", kind="inline_json", value=[0.1]
+        data_bin_shape=[1],
+        expectation_values=ShapedResultValue(
+            schema_version="1.0", shape=[1], dtype="float64", value=_artifact_ref()
+        ),
+        standard_deviations=ShapedResultValue(
+            schema_version="1.0",
+            shape=[1],
+            dtype="float64",
+            value=InlineJsonValue(
+                schema_version="1.0", kind="inline_json", value=[0.1]
+            ),
         ),
     )
 
     restored = EstimatorPubResult.model_validate_json(result.model_dump_json())
-    assert isinstance(restored.expectation_values, ArtifactRef)
-    assert isinstance(restored.standard_deviations, InlineJsonValue)
+    assert isinstance(restored.expectation_values.value, ArtifactRef)
+    assert isinstance(restored.standard_deviations.value, InlineJsonValue)
     schema = generated_schemas()["estimator-pub-result.schema.json"]
     invalid = result.model_dump(mode="json")
     invalid["expectation_values"] = {"untyped": [1, 2, 3]}
@@ -564,15 +627,37 @@ def test_sampler_register_preserves_locked_bitarray_shape_and_shots() -> None:
         pub_shape=list(bit_array.shape),
         num_shots=bit_array.num_shots,
         num_bits=bit_array.num_bits,
-        counts_by_location=[bit_array.get_counts(location) for location in locations],
-        bitstrings_by_location=[
-            bit_array.get_bitstrings(location) for location in locations
-        ],
+        packed_shape=list(bit_array.array.shape),
+        packed_bytes=InlineJsonValue(
+            schema_version="1.0", kind="inline_json", value=bit_array.array
+        ),
+        counts_by_location=InlineJsonValue(
+            schema_version="1.0",
+            kind="inline_json",
+            value=[bit_array.get_counts(location) for location in locations],
+        ),
+        bitstrings_by_location=InlineJsonValue(
+            schema_version="1.0",
+            kind="inline_json",
+            value=[bit_array.get_bitstrings(location) for location in locations],
+        ),
+        quasi_distributions_by_location=InlineJsonValue(
+            schema_version="1.0",
+            kind="inline_json",
+            value=[
+                {
+                    bitstring: count / bit_array.num_shots
+                    for bitstring, count in bit_array.get_counts(location).items()
+                }
+                for location in locations
+            ],
+        ),
     )
 
     assert result.pub_shape == [2]
     assert result.num_shots == 3
-    assert len(result.counts_by_location or []) == 2
+    assert isinstance(result.counts_by_location, InlineJsonValue)
+    assert len(result.counts_by_location.value) == 2
     assert SamplerRegisterResult.model_validate_json(result.model_dump_json()) == result
 
     with pytest.raises(ValidationError, match="one row-major entry"):
@@ -582,7 +667,23 @@ def test_sampler_register_preserves_locked_bitarray_shape_and_shots() -> None:
             pub_shape=[2],
             num_shots=3,
             num_bits=1,
-            counts_by_location=[{"0": 3}],
+            packed_shape=[2, 3, 1],
+            packed_bytes=InlineJsonValue(
+                schema_version="1.0", kind="inline_json", value=packed
+            ),
+            counts_by_location=InlineJsonValue(
+                schema_version="1.0", kind="inline_json", value=[{"0": 3}]
+            ),
+            bitstrings_by_location=InlineJsonValue(
+                schema_version="1.0",
+                kind="inline_json",
+                value=[["0", "0", "0"], ["0", "0", "0"]],
+            ),
+            quasi_distributions_by_location=InlineJsonValue(
+                schema_version="1.0",
+                kind="inline_json",
+                value=[{"0": 1.0}, {"0": 1.0}],
+            ),
         )
 
 
@@ -709,26 +810,42 @@ def test_artifactize_composes_with_estimator_values_at_exact_threshold(
         schema_version="1.0",
         pub_id="estimator-inline",
         pub_index=0,
-        expectation_values=inline,
-        standard_deviations=InlineJsonValue(
-            schema_version="1.0", kind="inline_json", value=[0.1, 0.2]
+        data_bin_shape=[2],
+        expectation_values=ShapedResultValue(
+            schema_version="1.0", shape=[2], dtype="float64", value=inline
+        ),
+        standard_deviations=ShapedResultValue(
+            schema_version="1.0",
+            shape=[2],
+            dtype="float64",
+            value=InlineJsonValue(
+                schema_version="1.0", kind="inline_json", value=[0.1, 0.2]
+            ),
         ),
     )
     referenced_result = EstimatorPubResult(
         schema_version="1.0",
         pub_id="estimator-artifact",
         pub_index=0,
-        expectation_values=referenced,
-        standard_deviations=InlineJsonValue(
-            schema_version="1.0", kind="inline_json", value=[0.1, 0.2]
+        data_bin_shape=[2],
+        expectation_values=ShapedResultValue(
+            schema_version="1.0", shape=[2], dtype="float64", value=referenced
+        ),
+        standard_deviations=ShapedResultValue(
+            schema_version="1.0",
+            shape=[2],
+            dtype="float64",
+            value=InlineJsonValue(
+                schema_version="1.0", kind="inline_json", value=[0.1, 0.2]
+            ),
         ),
     )
 
-    assert isinstance(inline_result.expectation_values, InlineJsonValue)
-    assert isinstance(referenced_result.expectation_values, ArtifactRef)
+    assert isinstance(inline_result.expectation_values.value, InlineJsonValue)
+    assert isinstance(referenced_result.expectation_values.value, ArtifactRef)
     assert isinstance(
         EstimatorPubResult.model_validate_json(
             referenced_result.model_dump_json()
-        ).expectation_values,
+        ).expectation_values.value,
         ArtifactRef,
     )

@@ -1066,7 +1066,7 @@ cx q[0], q[1];
 
             mock_pauli = Mock(name="hamiltonian")
             mock_pauli.apply_layout.return_value = Mock()
-            mock_pauli_cls.from_list.return_value = mock_pauli
+            mock_pauli_cls.return_value = mock_pauli
 
             job = Mock(name="est_job")
             job.job_id.return_value = "est_job_456"
@@ -1089,10 +1089,13 @@ cx q[0], q[1];
             assert result["status"] == "success"
             assert result["job_id"] == "est_job_456"
 
-            # Verify from_list was called with equal-weight observables
-            mock_pauli_cls.from_list.assert_called_once_with(
-                [("ZZ", 1.0), ("XX", 1.0), ("YY", 1.0)]
-            )
+            # Separate strings must remain three observables, not one weighted sum.
+            assert [item.args for item in mock_pauli_cls.call_args_list] == [
+                ("ZZ",),
+                ("XX",),
+                ("YY",),
+            ]
+            mock_pauli_cls.from_list.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_run_estimator_success_with_weighted_hamiltonian(

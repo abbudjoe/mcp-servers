@@ -344,7 +344,20 @@ class PauliObservables(VersionedContractModel):
     """A broadcast collection of separate Pauli observables."""
 
     kind: Literal["pauli_observables"]
-    values: list[str] = Field(min_length=1)
+    shape: list[NonNegativeInt]
+    values: JsonValue
+
+    @model_validator(mode="after")
+    def _values_match_declared_shape(self) -> PauliObservables:
+        actual_shape = _nested_shape(
+            self.values, leaf_type=str, field_name="observable values"
+        )
+        if actual_shape != self.shape:
+            raise ValueError(
+                f"observable values shape must equal declared shape {self.shape}; "
+                f"got {actual_shape}"
+            )
+        return self
 
 
 class SparsePauliHamiltonian(VersionedContractModel):
@@ -357,13 +370,66 @@ class SparsePauliHamiltonian(VersionedContractModel):
 ObservableSpec = PauliObservables | SparsePauliHamiltonian
 
 
+def _nested_shape(
+    value: Any,
+    *,
+    leaf_type: type[Any] | tuple[type[Any], ...],
+    field_name: str,
+) -> list[int]:
+    """Return the exact rectangular shape of a nested JSON value."""
+    if isinstance(value, leaf_type) and not isinstance(value, bool):
+        return []
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{field_name} must be a non-empty rectangular array")
+    child_shapes = [
+        _nested_shape(item, leaf_type=leaf_type, field_name=field_name)
+        for item in value
+    ]
+    if any(shape != child_shapes[0] for shape in child_shapes[1:]):
+        raise ValueError(f"{field_name} must be rectangular")
+    return [len(value), *child_shapes[0]]
+
+
+class ParameterBindings(VersionedContractModel):
+    """Deterministic named parameter values with an explicit broadcast shape."""
+
+    parameter_names: list[str] = Field(min_length=1)
+    shape: list[NonNegativeInt]
+    values: JsonValue
+
+    @field_validator("values", mode="before")
+    @classmethod
+    def _values_are_json_safe(cls, value: Any) -> JsonValue:
+        return to_json_safe(value)
+
+    @model_validator(mode="after")
+    def _values_match_declared_shape(self) -> ParameterBindings:
+        if len(self.parameter_names) != len(set(self.parameter_names)):
+            raise ValueError("parameter_names must be unique and ordered")
+        actual_shape = _nested_shape(
+            self.values, leaf_type=(int, float), field_name="parameter values"
+        )
+        expected_shape = [*self.shape, len(self.parameter_names)]
+        if actual_shape != expected_shape:
+            raise ValueError(
+                "parameter values shape must equal "
+                f"declared PUB shape plus parameter axis {expected_shape}; got {actual_shape}"
+            )
+        return self
+
+
 class SamplerPubSpec(VersionedContractModel):
     """Validated SamplerV2 PUB input."""
 
     pub_id: str = Field(min_length=1)
     circuit: CircuitArtifact
-    parameter_values: list[list[float]] | None
+    parameter_values: ParameterBindings | None
     shots: PositiveInt
+
+    @model_validator(mode="after")
+    def _parameters_match_circuit(self) -> SamplerPubSpec:
+        _validate_pub_parameters(self.circuit, self.parameter_values)
+        return self
 
 
 class EstimatorPubSpec(VersionedContractModel):
@@ -372,8 +438,28 @@ class EstimatorPubSpec(VersionedContractModel):
     pub_id: str = Field(min_length=1)
     circuit: CircuitArtifact
     observables: ObservableSpec = Field(discriminator="kind")
-    parameter_values: list[list[float]] | None
+    parameter_values: ParameterBindings | None
     precision: PositiveFloat | None
+
+    @model_validator(mode="after")
+    def _parameters_match_circuit(self) -> EstimatorPubSpec:
+        _validate_pub_parameters(self.circuit, self.parameter_values)
+        return self
+
+
+def _validate_pub_parameters(
+    circuit: CircuitArtifact, bindings: ParameterBindings | None
+) -> None:
+    if not circuit.parameter_names:
+        if bindings is not None:
+            raise ValueError("a non-parameterized circuit rejects parameter bindings")
+        return
+    if bindings is None:
+        raise ValueError("a parameterized circuit requires parameter bindings")
+    if bindings.parameter_names != circuit.parameter_names:
+        raise ValueError(
+            "parameter_names must exactly match circuit.parameter_names in deterministic order"
+        )
 
 
 class SubmissionPartition(VersionedContractModel):
@@ -447,49 +533,6 @@ class RuntimeUsage(VersionedContractModel):
     extensions: dict[str, Any] = Field(default_factory=dict)
 
 
-class SamplerRegisterResult(VersionedContractModel):
-    """One named classical register returned in a Sampler DataBin."""
-
-    register_name: str = Field(min_length=1)
-    pub_shape: list[NonNegativeInt]
-    num_shots: PositiveInt
-    num_bits: PositiveInt
-    counts_by_location: list[dict[str, NonNegativeInt]] | ArtifactRef | None = None
-    bitstrings_by_location: list[list[str]] | ArtifactRef | None = None
-    extensions: dict[str, Any] = Field(default_factory=dict)
-
-    @model_validator(mode="after")
-    def _location_payloads_match_shape(self) -> SamplerRegisterResult:
-        location_count = 1
-        for extent in self.pub_shape:
-            location_count *= extent
-        for name, payload in (
-            ("counts_by_location", self.counts_by_location),
-            ("bitstrings_by_location", self.bitstrings_by_location),
-        ):
-            if isinstance(payload, list) and len(payload) != location_count:
-                raise ValueError(
-                    f"{name} must contain one row-major entry per PUB location"
-                )
-        if isinstance(self.bitstrings_by_location, list) and any(
-            len(shots) != self.num_shots for shots in self.bitstrings_by_location
-        ):
-            raise ValueError(
-                "each bitstring location must contain exactly num_shots entries"
-            )
-        return self
-
-
-class SamplerPubResult(VersionedContractModel):
-    """Ordered result for one Sampler PUB."""
-
-    pub_id: str = Field(min_length=1)
-    pub_index: NonNegativeInt
-    registers: list[SamplerRegisterResult]
-    metadata: dict[str, Any] = Field(default_factory=dict)
-    extensions: dict[str, Any] = Field(default_factory=dict)
-
-
 class InlineJsonValue(VersionedContractModel):
     """Explicit inline branch for values that may instead be artifact-backed."""
 
@@ -505,16 +548,108 @@ class InlineJsonValue(VersionedContractModel):
 ArtifactValue = InlineJsonValue | ArtifactRef
 
 
+class SamplerRegisterResult(VersionedContractModel):
+    """One named classical register returned in a Sampler DataBin."""
+
+    register_name: str = Field(min_length=1)
+    pub_shape: list[NonNegativeInt]
+    num_shots: PositiveInt
+    num_bits: PositiveInt
+    packed_shape: list[NonNegativeInt]
+    packed_bytes: ArtifactValue
+    counts_by_location: ArtifactValue
+    bitstrings_by_location: ArtifactValue
+    quasi_distributions_by_location: ArtifactValue
+    extensions: dict[str, ArtifactValue] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _location_payloads_match_shape(self) -> SamplerRegisterResult:
+        expected_packed_shape = [
+            *self.pub_shape,
+            self.num_shots,
+            (self.num_bits + 7) // 8,
+        ]
+        if self.packed_shape != expected_packed_shape:
+            raise ValueError(
+                f"packed_shape must equal {expected_packed_shape}; got {self.packed_shape}"
+            )
+        location_count = 1
+        for extent in self.pub_shape:
+            location_count *= extent
+        for name, wrapped in (
+            ("counts_by_location", self.counts_by_location),
+            ("bitstrings_by_location", self.bitstrings_by_location),
+            ("quasi_distributions_by_location", self.quasi_distributions_by_location),
+        ):
+            if not isinstance(wrapped, InlineJsonValue):
+                continue
+            payload = wrapped.value
+            if not isinstance(payload, list) or len(payload) != location_count:
+                raise ValueError(
+                    f"{name} must contain one row-major entry per PUB location"
+                )
+        bitstrings = self.bitstrings_by_location
+        if isinstance(bitstrings, InlineJsonValue):
+            bitstring_rows = bitstrings.value
+            if not isinstance(bitstring_rows, list) or any(
+                not isinstance(shots, list) or len(shots) != self.num_shots
+                for shots in bitstring_rows
+            ):
+                raise ValueError(
+                    "each bitstring location must contain exactly num_shots entries"
+                )
+        return self
+
+
+class SamplerPubResult(VersionedContractModel):
+    """Ordered result for one Sampler PUB."""
+
+    pub_id: str = Field(min_length=1)
+    pub_index: NonNegativeInt
+    data_bin_shape: list[NonNegativeInt]
+    registers: list[SamplerRegisterResult]
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    extensions: dict[str, ArtifactValue] = Field(default_factory=dict)
+
+
+class ShapedResultValue(VersionedContractModel):
+    """Array/scalar result whose shape survives inline and artifact storage."""
+
+    shape: list[NonNegativeInt]
+    dtype: str = Field(min_length=1)
+    value: ArtifactValue
+
+
 class EstimatorPubResult(VersionedContractModel):
     """Ordered result for one Estimator PUB without collapsing array shape."""
 
     pub_id: str = Field(min_length=1)
     pub_index: NonNegativeInt
-    expectation_values: ArtifactValue
-    standard_deviations: ArtifactValue
-    ensemble_standard_error: ArtifactValue | None = None
+    data_bin_shape: list[NonNegativeInt]
+    expectation_values: ShapedResultValue
+    standard_deviations: ShapedResultValue | None = None
+    ensemble_standard_error: ShapedResultValue | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
-    extensions: dict[str, Any] = Field(default_factory=dict)
+    extensions: dict[str, ArtifactValue] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _error_representation_is_present(self) -> EstimatorPubResult:
+        if self.standard_deviations is None and self.ensemble_standard_error is None:
+            raise ValueError(
+                "estimator results require standard_deviations or ensemble_standard_error"
+            )
+        expected_shape = list(self.data_bin_shape)
+        shaped_values = [
+            self.expectation_values,
+            self.standard_deviations,
+            self.ensemble_standard_error,
+        ]
+        if any(
+            value is not None and list(value.shape) != expected_shape
+            for value in shaped_values
+        ):
+            raise ValueError("estimator result value shapes must match data_bin_shape")
+        return self
 
 
 class PrimitiveResultEnvelope(VersionedContractModel):
@@ -552,6 +687,7 @@ PUBLIC_MODELS: tuple[type[BaseModel], ...] = (
     BackendSnapshot,
     PauliObservables,
     SparsePauliHamiltonian,
+    ParameterBindings,
     SamplerPubSpec,
     EstimatorPubSpec,
     SubmissionPartition,
@@ -561,6 +697,7 @@ PUBLIC_MODELS: tuple[type[BaseModel], ...] = (
     SamplerRegisterResult,
     SamplerPubResult,
     InlineJsonValue,
+    ShapedResultValue,
     EstimatorPubResult,
     PrimitiveResultEnvelope,
 )

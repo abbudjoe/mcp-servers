@@ -77,41 +77,89 @@
       "title": "InlineJsonValue",
       "type": "object"
     },
-    "JsonValue": {}
+    "JsonValue": {},
+    "ShapedResultValue": {
+      "additionalProperties": true,
+      "description": "Array/scalar result whose shape survives inline and artifact storage.",
+      "properties": {
+        "dtype": {
+          "minLength": 1,
+          "title": "Dtype",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "shape": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Shape",
+          "type": "array"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InlineJsonValue"
+            },
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "schema_version",
+        "shape",
+        "dtype",
+        "value"
+      ],
+      "title": "ShapedResultValue",
+      "type": "object"
+    }
   },
   "$id": "https://qiskit.org/schemas/runtime-research/v1.0/estimator-pub-result.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": true,
   "description": "Ordered result for one Estimator PUB without collapsing array shape.",
   "properties": {
+    "data_bin_shape": {
+      "items": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Data Bin Shape",
+      "type": "array"
+    },
     "ensemble_standard_error": {
       "anyOf": [
         {
-          "$ref": "#/$defs/InlineJsonValue"
-        },
-        {
-          "$ref": "#/$defs/ArtifactRef"
+          "$ref": "#/$defs/ShapedResultValue"
         },
         {
           "type": "null"
         }
       ],
-      "default": null,
-      "title": "Ensemble Standard Error"
+      "default": null
     },
     "expectation_values": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/InlineJsonValue"
-        },
-        {
-          "$ref": "#/$defs/ArtifactRef"
-        }
-      ],
-      "title": "Expectation Values"
+      "$ref": "#/$defs/ShapedResultValue"
     },
     "extensions": {
-      "additionalProperties": true,
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/InlineJsonValue"
+          },
+          {
+            "$ref": "#/$defs/ArtifactRef"
+          }
+        ]
+      },
       "title": "Extensions",
       "type": "object"
     },
@@ -138,21 +186,21 @@
     "standard_deviations": {
       "anyOf": [
         {
-          "$ref": "#/$defs/InlineJsonValue"
+          "$ref": "#/$defs/ShapedResultValue"
         },
         {
-          "$ref": "#/$defs/ArtifactRef"
+          "type": "null"
         }
       ],
-      "title": "Standard Deviations"
+      "default": null
     }
   },
   "required": [
     "schema_version",
     "pub_id",
     "pub_index",
-    "expectation_values",
-    "standard_deviations"
+    "data_bin_shape",
+    "expectation_values"
   ],
   "title": "EstimatorPubResult",
   "type": "object",
