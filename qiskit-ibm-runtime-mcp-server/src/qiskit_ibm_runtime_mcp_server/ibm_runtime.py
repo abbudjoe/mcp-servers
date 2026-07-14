@@ -16,10 +16,12 @@ import asyncio
 import contextlib
 import logging
 import os
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Any, Literal
 
+from qiskit.primitives.containers import BitArray, DataBin
 from qiskit.quantum_info import SparsePauliOp
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_ibm_runtime import EstimatorV2, QiskitRuntimeService, SamplerV2
@@ -27,6 +29,7 @@ from qiskit_ibm_runtime.fake_provider import FakeProviderForBackendV2
 from qiskit_ibm_runtime.options import EstimatorOptions, SamplerOptions
 from qiskit_mcp_server.circuit_serialization import CircuitFormat, load_circuit
 
+from qiskit_ibm_runtime_mcp_server.core import LocalArtifactCAS, parse_primitive_result
 from qiskit_ibm_runtime_mcp_server.core.snapshots import (
     FractionalGateMode,
     resolve_backend_snapshot,
@@ -41,6 +44,12 @@ DDSequenceType = Literal["XX", "XpXm", "XY4"]
 # Configure logging
 logger = logging.getLogger(__name__)
 install_secret_redaction(logger)
+
+_LEGACY_PRIMITIVE_WARNING = (
+    "This convenience API accepts one ambiguous legacy PUB. Migrate to the typed "
+    "SamplerPubSpec/EstimatorPubSpec APIs for explicit observable semantics, named "
+    "parameter binding, multi-PUB identity, and shape-preserving results."
+)
 
 
 def get_instance_from_env() -> str | None:
@@ -1340,7 +1349,14 @@ async def get_job_status(job_id: str) -> dict[str, Any]:
 
 
 @with_sync
-async def get_job_results(job_id: str) -> dict[str, Any]:
+async def get_job_results(
+    job_id: str,
+    primitive: Literal["sampler", "estimator"] | None = None,
+    pub_ids: list[str] | None = None,
+    pub_shapes: list[list[int]] | None = None,
+    artifact_directory: str | None = None,
+    artifact_threshold_bytes: int = 1_000_000,
+) -> dict[str, Any]:
     """
     Get measurement results from a completed quantum job.
 
@@ -1397,37 +1413,116 @@ async def get_job_results(job_id: str) -> dict[str, Any]:
         # Job is DONE - retrieve results
         result = job.result()
 
-        # Extract counts from the result
-        # SamplerV2 results have data attributes for each classical register
-        counts = {}
-        if result and len(result) > 0:
-            pub_result = result[0]
-            # Try common classical register names
-            data = pub_result.data
-            for attr_name in ["meas", "c", "cr", "result"]:
-                if hasattr(data, attr_name):
-                    creg_data = getattr(data, attr_name)
-                    if hasattr(creg_data, "get_counts"):
-                        counts = creg_data.get_counts()
-                        break
-            # If no common name found, try to get any BitArray attribute
-            if not counts:
-                for attr_name in dir(data):
-                    if not attr_name.startswith("_"):
-                        attr = getattr(data, attr_name)
-                        if hasattr(attr, "get_counts"):
-                            counts = attr.get_counts()
-                            break
-
-        # Calculate total shots from counts
-        total_shots = sum(counts.values()) if counts else 0
-
         # Get execution time if available
         execution_time = None
         if hasattr(job, "metrics") and job.metrics():
             metrics = job.metrics()
             if "usage" in metrics:
                 execution_time = metrics["usage"].get("quantum_seconds")
+
+        result_items = list(result)
+        if result_items and all(
+            isinstance(getattr(pub_result, "data", None), DataBin)
+            for pub_result in result_items
+        ):
+            explicit_contract_parts = (primitive, pub_ids, pub_shapes)
+            if any(value is None for value in explicit_contract_parts) and not all(
+                value is None for value in explicit_contract_parts
+            ):
+                return {
+                    "status": "error",
+                    "message": "primitive, pub_ids, and pub_shapes must be provided together",
+                }
+            migration_warning = None
+            resolved_primitive = primitive
+            resolved_pub_ids = pub_ids
+            resolved_pub_shapes = pub_shapes
+            if resolved_primitive is None:
+                key_sets = [set(pub_result.data.keys()) for pub_result in result_items]
+                if all(
+                    "evs" in keys and bool({"stds", "ensemble_standard_error"} & keys)
+                    for keys in key_sets
+                ):
+                    resolved_primitive = "estimator"
+                elif all(
+                    any(
+                        isinstance(value, BitArray)
+                        for value in pub_result.data.values()
+                    )
+                    and not ({"evs", "stds"} & keys)
+                    for pub_result, keys in zip(result_items, key_sets, strict=True)
+                ):
+                    resolved_primitive = "sampler"
+                else:
+                    return {
+                        "status": "error",
+                        "message": "Cannot infer one Primitive V2 type from mixed or incomplete DataBins; provide primitive and pub_ids explicitly",
+                    }
+                resolved_pub_ids = [
+                    f"legacy-pub-{index}" for index in range(len(result_items))
+                ]
+                resolved_pub_shapes = [
+                    list(pub_result.data.shape) for pub_result in result_items
+                ]
+                migration_warning = (
+                    "Result PUB identities were not supplied, so synthetic legacy IDs were "
+                    "assigned. Pass primitive and pub_ids from typed submission to preserve "
+                    "caller-owned identity across process restarts."
+                )
+            assert resolved_pub_ids is not None  # nosec B101 - narrowed above
+            assert resolved_pub_shapes is not None  # nosec B101 - narrowed above
+            artifact_root = (
+                artifact_directory
+                or os.getenv("QISKIT_MCP_ARTIFACT_DIR")
+                or "~/.qiskit-mcp/artifacts"
+            )
+            envelope = parse_primitive_result(
+                result,
+                primitive=resolved_primitive,
+                pub_ids=resolved_pub_ids,
+                expected_pub_shapes=resolved_pub_shapes,
+                job_id=job_id,
+                backend_name=backend_name,
+                sink=LocalArtifactCAS(artifact_root),
+                threshold_bytes=artifact_threshold_bytes,
+                actual_qpu_seconds=execution_time,
+            )
+            payload = envelope.model_dump(mode="json")
+            response: dict[str, Any] = {
+                "status": "success",
+                "job_id": job_id,
+                "job_status": job_status,
+                "backend": backend_name,
+                "result": payload,
+                "execution_time": execution_time,
+                "message": "All Primitive V2 PUB results retrieved successfully",
+            }
+            if migration_warning is not None:
+                response["migration_warning"] = migration_warning
+            # Preserve the scalar legacy convenience view only when it is exact and inline.
+            if resolved_primitive == "sampler" and len(payload["pub_results"]) == 1:
+                registers = payload["pub_results"][0]["registers"]
+                if len(registers) == 1:
+                    wrapped_counts = registers[0]["counts_by_location"]
+                    if (
+                        wrapped_counts.get("kind") == "inline_json"
+                        and payload["pub_results"][0]["data_bin_shape"] == []
+                    ):
+                        response["counts"] = wrapped_counts["value"][0]
+                        response["shots"] = registers[0]["num_shots"]
+            return response
+
+        warnings.warn(_LEGACY_PRIMITIVE_WARNING, DeprecationWarning, stacklevel=2)
+        counts: dict[str, int] = {}
+        if result_items:
+            data = result_items[0].data
+            for attr_name in ["meas", "c", "cr", "result"]:
+                creg_data = getattr(data, attr_name, None)
+                get_counts = getattr(creg_data, "get_counts", None)
+                if callable(get_counts):
+                    counts = get_counts()
+                    break
+        total_shots = sum(counts.values())
 
         return {
             "status": "success",
@@ -1438,6 +1533,7 @@ async def get_job_results(job_id: str) -> dict[str, Any]:
             "shots": total_shots,
             "execution_time": execution_time,
             "message": "Results retrieved successfully",
+            "migration_warning": _LEGACY_PRIMITIVE_WARNING,
         }
 
     except Exception as e:
@@ -1608,6 +1704,7 @@ async def run_estimator(
         - Weighted Hamiltonian: [("IIXY", 0.5), ("ZZII", -0.3), ("XXYY", 0.2)]
     """
     global service
+    warnings.warn(_LEGACY_PRIMITIVE_WARNING, DeprecationWarning, stacklevel=2)
 
     # Validate inputs before any network calls
     if not 0 <= optimization_level <= 3:
@@ -1637,11 +1734,13 @@ async def run_estimator(
             return {"status": "error", "message": backend_error}
         assert backend is not None  # Type narrowing for mypy  # nosec B101
 
-        # Parse observables into SparsePauliOp
+        # Preserve the legacy documented distinction: a string list is a vector of
+        # separate observables, while weighted pairs are one Hamiltonian.
         try:
             if isinstance(observables, str):
-                # Single Pauli string
-                hamiltonian = SparsePauliOp(observables)
+                parsed_observables: SparsePauliOp | list[SparsePauliOp] = SparsePauliOp(
+                    observables
+                )
             elif isinstance(observables, list):
                 if not observables:
                     return {
@@ -1652,13 +1751,9 @@ async def run_estimator(
                 # Check if it's a list of tuples/lists (weighted) or strings
                 # Note: JSON serialization converts tuples to lists, so we check both
                 if isinstance(observables[0], (tuple, list)):
-                    # List of (Pauli, coefficient) tuples/lists
-                    hamiltonian = SparsePauliOp.from_list(observables)
+                    parsed_observables = SparsePauliOp.from_list(observables)
                 else:
-                    # List of Pauli strings (equal weights)
-                    hamiltonian = SparsePauliOp.from_list(
-                        [(obs, 1.0) for obs in observables]
-                    )
+                    parsed_observables = [SparsePauliOp(obs) for obs in observables]
         except Exception as e:
             return {
                 "status": "error",
@@ -1672,7 +1767,14 @@ async def run_estimator(
         isa_circuit = pm.run(qc)
 
         # Apply layout to observables
-        isa_observables = hamiltonian.apply_layout(isa_circuit.layout)
+        isa_observables: SparsePauliOp | list[SparsePauliOp]
+        if isinstance(parsed_observables, list):
+            isa_observables = [
+                observable.apply_layout(isa_circuit.layout)
+                for observable in parsed_observables
+            ]
+        else:
+            isa_observables = parsed_observables.apply_layout(isa_circuit.layout)
 
         # Configure error mitigation options
         options = EstimatorOptions()
@@ -1702,8 +1804,8 @@ async def run_estimator(
         # Type: tuple[QuantumCircuit, SparsePauliOp] | tuple[QuantumCircuit, SparsePauliOp, list[list[float]]]
         pub: tuple[Any, ...]
         if parameter_values is not None:
-            # Parameterized circuit with values
-            pub = (isa_circuit, isa_observables, [parameter_values])
+            # A flat vector binds one deterministic circuit.parameters location.
+            pub = (isa_circuit, isa_observables, parameter_values)
         else:
             # Non-parameterized circuit
             pub = (isa_circuit, isa_observables)
@@ -1733,6 +1835,8 @@ async def run_estimator(
             "message": f"Estimator job submitted successfully to {backend.name}",
             "note": "Use get_job_status_tool with the job_id to check completion. "
             "Results will contain expectation values for the specified observables.",
+            "migration_warning": _LEGACY_PRIMITIVE_WARNING,
+            "pub_ids": ["legacy-pub-0"],
         }
 
     except Exception as e:
@@ -2104,6 +2208,7 @@ async def run_sampler(
         Results include measurement outcomes as bitstrings with their counts.
     """
     global service
+    warnings.warn(_LEGACY_PRIMITIVE_WARNING, DeprecationWarning, stacklevel=2)
 
     # Validate inputs before any network calls
     if shots < 1:
@@ -2163,6 +2268,8 @@ async def run_sampler(
             "message": f"Sampler job submitted successfully to {backend.name}",
             "note": "Use get_job_status_tool with the job_id to check completion. "
             "Results will contain measurement bitstrings and their counts.",
+            "migration_warning": _LEGACY_PRIMITIVE_WARNING,
+            "pub_ids": ["legacy-pub-0"],
         }
 
     except Exception as e:

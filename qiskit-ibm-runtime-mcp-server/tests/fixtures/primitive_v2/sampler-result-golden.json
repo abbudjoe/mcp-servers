@@ -1,0 +1,94 @@
+{
+  "actual_qpu_seconds": 1.25,
+  "backend_name": "ibm_fixture",
+  "extensions": {},
+  "job_id": "job-sampler",
+  "job_metadata": {"fixture": "sampler", "primitive_version": 2},
+  "primitive": "sampler",
+  "pub_results": [
+    {
+      "data_bin_shape": [],
+      "extensions": {"future_scalar": {"kind": "inline_json", "schema_version": "1.0", "value": {"calibration": "v2"}}},
+      "metadata": {"case": "scalar-multi-register"},
+      "pub_id": "s-scalar",
+      "pub_index": 0,
+      "registers": [
+        {
+          "bitstrings_by_location": {"kind": "inline_json", "schema_version": "1.0", "value": [["0", "1"]]},
+          "counts_by_location": {"kind": "inline_json", "schema_version": "1.0", "value": [{"0": 1, "1": 1}]},
+          "extensions": {},
+          "num_bits": 1,
+          "num_shots": 2,
+          "packed_bytes": {"kind": "inline_json", "schema_version": "1.0", "value": [[0], [1]]},
+          "packed_shape": [2, 1],
+          "pub_shape": [],
+          "quasi_distributions_by_location": {"kind": "inline_json", "schema_version": "1.0", "value": [{"0": 0.5, "1": 0.5}]},
+          "register_name": "alpha",
+          "schema_version": "1.0"
+        },
+        {
+          "bitstrings_by_location": {"kind": "inline_json", "schema_version": "1.0", "value": [["00", "11"]]},
+          "counts_by_location": {"kind": "inline_json", "schema_version": "1.0", "value": [{"00": 1, "11": 1}]},
+          "extensions": {},
+          "num_bits": 2,
+          "num_shots": 2,
+          "packed_bytes": {"kind": "inline_json", "schema_version": "1.0", "value": [[0], [3]]},
+          "packed_shape": [2, 1],
+          "pub_shape": [],
+          "quasi_distributions_by_location": {"kind": "inline_json", "schema_version": "1.0", "value": [{"00": 0.5, "11": 0.5}]},
+          "register_name": "beta",
+          "schema_version": "1.0"
+        }
+      ],
+      "schema_version": "1.0"
+    },
+    {
+      "data_bin_shape": [2],
+      "extensions": {"future_vector": {"kind": "inline_json", "schema_version": "1.0", "value": [10, 20]}},
+      "metadata": {"case": "vector"},
+      "pub_id": "s-vector",
+      "pub_index": 1,
+      "registers": [
+        {
+          "bitstrings_by_location": {"kind": "inline_json", "schema_version": "1.0", "value": [["0", "1"], ["1", "1"]]},
+          "counts_by_location": {"kind": "inline_json", "schema_version": "1.0", "value": [{"0": 1, "1": 1}, {"1": 2}]},
+          "extensions": {},
+          "num_bits": 1,
+          "num_shots": 2,
+          "packed_bytes": {"kind": "inline_json", "schema_version": "1.0", "value": [[[0], [1]], [[1], [1]]]},
+          "packed_shape": [2, 2, 1],
+          "pub_shape": [2],
+          "quasi_distributions_by_location": {"kind": "inline_json", "schema_version": "1.0", "value": [{"0": 0.5, "1": 0.5}, {"1": 1.0}]},
+          "register_name": "meas",
+          "schema_version": "1.0"
+        }
+      ],
+      "schema_version": "1.0"
+    },
+    {
+      "data_bin_shape": [2, 2],
+      "extensions": {},
+      "metadata": {"case": "multidimensional"},
+      "pub_id": "s-matrix",
+      "pub_index": 2,
+      "registers": [
+        {
+          "bitstrings_by_location": {"kind": "inline_json", "schema_version": "1.0", "value": [["0", "1"], ["1", "0"], ["1", "1"], ["0", "0"]]},
+          "counts_by_location": {"kind": "inline_json", "schema_version": "1.0", "value": [{"0": 1, "1": 1}, {"0": 1, "1": 1}, {"1": 2}, {"0": 2}]},
+          "extensions": {},
+          "num_bits": 1,
+          "num_shots": 2,
+          "packed_bytes": {"kind": "inline_json", "schema_version": "1.0", "value": [[[[0], [1]], [[1], [0]]], [[[1], [1]], [[0], [0]]]]},
+          "packed_shape": [2, 2, 2, 1],
+          "pub_shape": [2, 2],
+          "quasi_distributions_by_location": {"kind": "inline_json", "schema_version": "1.0", "value": [{"0": 0.5, "1": 0.5}, {"0": 0.5, "1": 0.5}, {"1": 1.0}, {"0": 1.0}]},
+          "register_name": "meas",
+          "schema_version": "1.0"
+        }
+      ],
+      "schema_version": "1.0"
+    }
+  ],
+  "schema_version": "1.0",
+  "usage": null
+}

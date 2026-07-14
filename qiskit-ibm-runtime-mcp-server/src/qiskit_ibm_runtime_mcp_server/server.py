@@ -27,7 +27,7 @@ Dependencies:
 
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastmcp import FastMCP
 from qiskit_mcp_server.circuit_serialization import CircuitFormat
@@ -355,39 +355,50 @@ async def get_job_status_tool(job_id: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-async def get_job_results_tool(job_id: str) -> dict[str, Any]:
-    """Get measurement results from a completed quantum job.
+async def get_job_results_tool(
+    job_id: str,
+    primitive: Literal["sampler", "estimator"] | None = None,
+    pub_ids: list[str] | None = None,
+    pub_shapes: list[list[int]] | None = None,
+    artifact_directory: str | None = None,
+    artifact_threshold_bytes: int = 1_000_000,
+) -> dict[str, Any]:
+    """Get complete shape-preserving Primitive V2 results from a completed job.
 
-    Retrieves the measurement outcomes (counts) from a job that has finished
-    execution. The job must be in DONE status to retrieve results.
+    Retrieves every returned PUB and DataBin key. Pass the primitive and the ordered
+    pub_ids and pub_shapes returned by typed submission to preserve caller-owned identity
+    and validate returned shapes. Omitting all three invokes a deprecated inference path.
 
     Use this tool after a job submitted with run_sampler_tool has completed.
     First check the job status with get_job_status_tool, then retrieve results
     when the job status is DONE.
 
     Args:
-        job_id: ID of the completed job (returned by run_sampler_tool)
+        job_id: ID of the completed job.
+        primitive: Explicit primitive kind; provide together with pub_ids.
+        pub_ids: Ordered identities of every submitted PUB.
+        pub_shapes: Ordered broadcast shapes of every submitted PUB.
+        artifact_directory: Local content-addressed storage root for large arrays.
+        artifact_threshold_bytes: Maximum canonical JSON size retained inline.
 
     Returns:
         Dictionary containing:
         - status: "success", "pending", or "error"
         - job_id: The job ID
         - job_status: Current status of the job
-        - counts: Dictionary of measurement outcomes and their counts
-                 (e.g., {"00": 2048, "11": 2048} for a Bell state)
-        - shots: Total number of shots executed
+        - result: Versioned PrimitiveResultEnvelope with every ordered PUB
         - backend: Name of the backend used
         - execution_time: Quantum execution time in seconds (if available)
-        - message: Status message
-
-    Example workflow:
-        1. Submit job: result = run_sampler_tool(circuit, backend_name)
-        2. Get job_id from result
-        3. Check status: status = get_job_status_tool(job_id)
-        4. When DONE: results = get_job_results_tool(job_id)
-        5. Analyze counts in results["counts"]
+        - migration_warning: Present only when legacy identity inference was used
     """
-    return await get_job_results(job_id)
+    return await get_job_results(
+        job_id,
+        primitive=primitive,
+        pub_ids=pub_ids,
+        pub_shapes=pub_shapes,
+        artifact_directory=artifact_directory,
+        artifact_threshold_bytes=artifact_threshold_bytes,
+    )
 
 
 @mcp.tool()

@@ -726,6 +726,68 @@ def _circuit_from_immutable_source(source: IngestedCircuit) -> QuantumCircuit:
         raise CircuitFormatError(f"QASM3 deserialization failed: {exc}") from exc
 
 
+def load_circuit_artifact(
+    artifact: CircuitArtifact, *, sink: ArtifactSink
+) -> IngestedCircuit:
+    """Reconstruct a circuit from verified artifact bytes and reject metadata drift."""
+    raw_bytes = sink.get_bytes(artifact.artifact)
+    if artifact.format == "qpy":
+        header = _parse_qpy_header(raw_bytes)
+        if (
+            header.qpy_version != artifact.qpy_version
+            or header.qiskit_version != artifact.qiskit_version
+            or header.symbolic_encoding != artifact.qpy_symbolic_encoding
+        ):
+            raise CircuitContractError(
+                "circuit artifact QPY header does not match declared writer metadata"
+            )
+        circuit = _load_single_qpy(raw_bytes)
+    else:
+        try:
+            circuit = qasm3_loads(raw_bytes.decode("utf-8"))
+        except Exception as exc:
+            raise CircuitFormatError(f"QASM3 deserialization failed: {exc}") from exc
+
+    observed = {
+        "num_qubits": circuit.num_qubits,
+        "num_clbits": circuit.num_clbits,
+        "size": circuit.size(),
+        "depth": circuit.depth(),
+        "parameter_names": [parameter.name for parameter in circuit.parameters],
+        "registers": [
+            register.model_dump(mode="json") for register in _registers(circuit)
+        ],
+        "metadata": to_json_safe(circuit.metadata or {}),
+        "layout": _layout(circuit),
+    }
+    declared = {
+        "num_qubits": artifact.num_qubits,
+        "num_clbits": artifact.num_clbits,
+        "size": artifact.size,
+        "depth": artifact.depth,
+        "parameter_names": artifact.parameter_names,
+        "registers": [
+            register.model_dump(mode="json") for register in artifact.registers
+        ],
+        "metadata": artifact.metadata,
+        "layout": artifact.layout,
+    }
+    if observed != declared:
+        mismatches = sorted(
+            field_name
+            for field_name in observed
+            if observed[field_name] != declared[field_name]
+        )
+        raise CircuitContractError(
+            "circuit artifact structural metadata drift: " + ", ".join(mismatches)
+        )
+    return IngestedCircuit(
+        circuit=circuit,
+        artifact=artifact,
+        serialized_bytes=raw_bytes,
+    )
+
+
 def _load_single_qpy(raw_bytes: bytes) -> QuantumCircuit:
     """Reload one QPY circuit after independently checking its file cardinality."""
     header = _parse_qpy_header(raw_bytes)

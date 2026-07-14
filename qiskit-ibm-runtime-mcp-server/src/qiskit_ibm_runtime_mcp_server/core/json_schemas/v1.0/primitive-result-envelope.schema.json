@@ -55,34 +55,39 @@
       "additionalProperties": true,
       "description": "Ordered result for one Estimator PUB without collapsing array shape.",
       "properties": {
+        "data_bin_shape": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Data Bin Shape",
+          "type": "array"
+        },
         "ensemble_standard_error": {
           "anyOf": [
             {
-              "$ref": "#/$defs/InlineJsonValue"
-            },
-            {
-              "$ref": "#/$defs/ArtifactRef"
+              "$ref": "#/$defs/ShapedResultValue"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Ensemble Standard Error"
+          "default": null
         },
         "expectation_values": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/InlineJsonValue"
-            },
-            {
-              "$ref": "#/$defs/ArtifactRef"
-            }
-          ],
-          "title": "Expectation Values"
+          "$ref": "#/$defs/ShapedResultValue"
         },
         "extensions": {
-          "additionalProperties": true,
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/InlineJsonValue"
+              },
+              {
+                "$ref": "#/$defs/ArtifactRef"
+              }
+            ]
+          },
           "title": "Extensions",
           "type": "object"
         },
@@ -109,21 +114,21 @@
         "standard_deviations": {
           "anyOf": [
             {
-              "$ref": "#/$defs/InlineJsonValue"
+              "$ref": "#/$defs/ShapedResultValue"
             },
             {
-              "$ref": "#/$defs/ArtifactRef"
+              "type": "null"
             }
           ],
-          "title": "Standard Deviations"
+          "default": null
         }
       },
       "required": [
         "schema_version",
         "pub_id",
         "pub_index",
-        "expectation_values",
-        "standard_deviations"
+        "data_bin_shape",
+        "expectation_values"
       ],
       "title": "EstimatorPubResult",
       "type": "object"
@@ -222,8 +227,25 @@
       "additionalProperties": true,
       "description": "Ordered result for one Sampler PUB.",
       "properties": {
+        "data_bin_shape": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Data Bin Shape",
+          "type": "array"
+        },
         "extensions": {
-          "additionalProperties": true,
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/InlineJsonValue"
+              },
+              {
+                "$ref": "#/$defs/ArtifactRef"
+              }
+            ]
+          },
           "title": "Extensions",
           "type": "object"
         },
@@ -259,6 +281,7 @@
         "schema_version",
         "pub_id",
         "pub_index",
+        "data_bin_shape",
         "registers"
       ],
       "title": "SamplerPubResult",
@@ -271,48 +294,36 @@
         "bitstrings_by_location": {
           "anyOf": [
             {
-              "items": {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              "type": "array"
+              "$ref": "#/$defs/InlineJsonValue"
             },
             {
               "$ref": "#/$defs/ArtifactRef"
-            },
-            {
-              "type": "null"
             }
           ],
-          "default": null,
           "title": "Bitstrings By Location"
         },
         "counts_by_location": {
           "anyOf": [
             {
-              "items": {
-                "additionalProperties": {
-                  "minimum": 0,
-                  "type": "integer"
-                },
-                "type": "object"
-              },
-              "type": "array"
+              "$ref": "#/$defs/InlineJsonValue"
             },
             {
               "$ref": "#/$defs/ArtifactRef"
-            },
-            {
-              "type": "null"
             }
           ],
-          "default": null,
           "title": "Counts By Location"
         },
         "extensions": {
-          "additionalProperties": true,
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/InlineJsonValue"
+              },
+              {
+                "$ref": "#/$defs/ArtifactRef"
+              }
+            ]
+          },
           "title": "Extensions",
           "type": "object"
         },
@@ -326,6 +337,25 @@
           "title": "Num Shots",
           "type": "integer"
         },
+        "packed_bytes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InlineJsonValue"
+            },
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            }
+          ],
+          "title": "Packed Bytes"
+        },
+        "packed_shape": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Packed Shape",
+          "type": "array"
+        },
         "pub_shape": {
           "items": {
             "minimum": 0,
@@ -333,6 +363,17 @@
           },
           "title": "Pub Shape",
           "type": "array"
+        },
+        "quasi_distributions_by_location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InlineJsonValue"
+            },
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            }
+          ],
+          "title": "Quasi Distributions By Location"
         },
         "register_name": {
           "minLength": 1,
@@ -350,9 +391,57 @@
         "register_name",
         "pub_shape",
         "num_shots",
-        "num_bits"
+        "num_bits",
+        "packed_shape",
+        "packed_bytes",
+        "counts_by_location",
+        "bitstrings_by_location",
+        "quasi_distributions_by_location"
       ],
       "title": "SamplerRegisterResult",
+      "type": "object"
+    },
+    "ShapedResultValue": {
+      "additionalProperties": true,
+      "description": "Array/scalar result whose shape survives inline and artifact storage.",
+      "properties": {
+        "dtype": {
+          "minLength": 1,
+          "title": "Dtype",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "shape": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Shape",
+          "type": "array"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InlineJsonValue"
+            },
+            {
+              "$ref": "#/$defs/ArtifactRef"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "schema_version",
+        "shape",
+        "dtype",
+        "value"
+      ],
+      "title": "ShapedResultValue",
       "type": "object"
     }
   },
