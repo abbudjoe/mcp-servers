@@ -1,0 +1,65 @@
+{
+  "$id": "https://qiskit.org/schemas/runtime-research/v1.0/pub-shape.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "Resolved Primitive V2 broadcast and execution cardinality for one PUB.",
+  "properties": {
+    "circuit_executions": {
+      "exclusiveMinimum": 0,
+      "title": "Circuit Executions",
+      "type": "integer"
+    },
+    "observable_shape": {
+      "anyOf": [
+        {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Observable Shape"
+    },
+    "parameter_shape": {
+      "items": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Parameter Shape",
+      "type": "array"
+    },
+    "pub_id": {
+      "minLength": 1,
+      "title": "Pub Id",
+      "type": "string"
+    },
+    "result_shape": {
+      "items": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Result Shape",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "pub_id",
+    "parameter_shape",
+    "observable_shape",
+    "result_shape",
+    "circuit_executions"
+  ],
+  "title": "PubShape",
+  "type": "object",
+  "x-schema-version": "1.0"
+}

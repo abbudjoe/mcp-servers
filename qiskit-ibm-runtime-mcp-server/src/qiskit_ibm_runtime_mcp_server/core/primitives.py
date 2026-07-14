@@ -165,7 +165,7 @@ def prepare_estimator_pubs(
     return prepared
 
 
-def submit_sampler_pubs(
+def _submit_sampler_pubs_unchecked(
     sampler: PrimitiveRunner,
     pubs: Sequence[SamplerPubSpec],
     *,
@@ -182,7 +182,7 @@ def submit_sampler_pubs(
     )
 
 
-def submit_estimator_pubs(
+def _submit_estimator_pubs_unchecked(
     estimator: PrimitiveRunner,
     pubs: Sequence[EstimatorPubSpec],
     *,

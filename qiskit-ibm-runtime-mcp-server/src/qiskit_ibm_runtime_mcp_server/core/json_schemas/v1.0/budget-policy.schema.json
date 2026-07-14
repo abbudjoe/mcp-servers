@@ -1,0 +1,144 @@
+{
+  "$id": "https://qiskit.org/schemas/runtime-research/v1.0/budget-policy.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Fail-closed planning and live-execution policy.",
+  "properties": {
+    "allow_live_qpu": {
+      "default": false,
+      "title": "Allow Live Qpu",
+      "type": "boolean"
+    },
+    "allow_paid_fallback": {
+      "default": false,
+      "title": "Allow Paid Fallback",
+      "type": "boolean"
+    },
+    "allowed_backends": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Backends",
+      "type": "array"
+    },
+    "allowed_instance_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Instance Ids",
+      "type": "array"
+    },
+    "allowed_paid_instance_ids": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Paid Instance Ids",
+      "type": "array"
+    },
+    "approval_ttl_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Approval Ttl Seconds",
+      "type": "integer"
+    },
+    "batch_max_time_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Batch Max Time Seconds",
+      "type": "integer"
+    },
+    "dry_run": {
+      "default": true,
+      "title": "Dry Run",
+      "type": "boolean"
+    },
+    "max_circuits": {
+      "exclusiveMinimum": 0,
+      "title": "Max Circuits",
+      "type": "integer"
+    },
+    "max_estimated_qpu_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Max Estimated Qpu Seconds",
+      "type": "number"
+    },
+    "max_execution_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Max Execution Seconds",
+      "type": "integer"
+    },
+    "max_jobs": {
+      "exclusiveMinimum": 0,
+      "title": "Max Jobs",
+      "type": "integer"
+    },
+    "max_partitions": {
+      "exclusiveMinimum": 0,
+      "title": "Max Partitions",
+      "type": "integer"
+    },
+    "max_pubs": {
+      "exclusiveMinimum": 0,
+      "title": "Max Pubs",
+      "type": "integer"
+    },
+    "max_pubs_per_job": {
+      "exclusiveMinimum": 0,
+      "title": "Max Pubs Per Job",
+      "type": "integer"
+    },
+    "max_shots_per_pub": {
+      "exclusiveMinimum": 0,
+      "title": "Max Shots Per Pub",
+      "type": "integer"
+    },
+    "permitted_primitives": {
+      "items": {
+        "enum": [
+          "sampler",
+          "estimator"
+        ],
+        "type": "string"
+      },
+      "title": "Permitted Primitives",
+      "type": "array"
+    },
+    "permitted_treatments": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Permitted Treatments",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "ttl_margin_seconds": {
+      "default": 60,
+      "minimum": 0,
+      "title": "Ttl Margin Seconds",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "max_estimated_qpu_seconds",
+    "max_execution_seconds",
+    "max_jobs",
+    "max_pubs",
+    "max_circuits",
+    "max_partitions",
+    "max_pubs_per_job",
+    "max_shots_per_pub",
+    "batch_max_time_seconds",
+    "approval_ttl_seconds",
+    "allowed_instance_ids",
+    "allowed_backends",
+    "permitted_primitives"
+  ],
+  "title": "BudgetPolicy",
+  "type": "object",
+  "x-schema-version": "1.0"
+}

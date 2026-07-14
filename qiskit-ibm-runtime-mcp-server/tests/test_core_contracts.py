@@ -36,6 +36,7 @@ from qiskit_ibm_runtime_mcp_server.core.artifacts import (
 )
 from qiskit_ibm_runtime_mcp_server.core.models import (
     ApprovalReceipt,
+    ApprovedSubmission,
     ArtifactRef,
     BackendSnapshot,
     BatchExecutionLimits,
@@ -47,6 +48,7 @@ from qiskit_ibm_runtime_mcp_server.core.models import (
     BatchSubmissionFailure,
     BatchSubmissionReceipt,
     BatchUsage,
+    BudgetPolicy,
     CircuitArtifact,
     EstimatorPubResult,
     EstimatorPubSpec,
@@ -55,17 +57,20 @@ from qiskit_ibm_runtime_mcp_server.core.models import (
     ParameterBindings,
     PrimitiveResultEnvelope,
     PubExecutionEstimate,
+    PubShape,
     PUBLIC_MODELS,
     RecoveredSubmissionStatus,
     RuntimeUsage,
     SamplerPubResult,
     SamplerPubSpec,
+    ScheduledPubEstimate,
     SamplerRegisterResult,
     ShapedResultValue,
     SparsePauliHamiltonian,
     SubmissionPartition,
     SubmissionPlan,
     SubmissionKeyStatus,
+    UsageReconciliation,
 )
 from qiskit_ibm_runtime_mcp_server.core.schemas import (
     generated_schemas,
@@ -349,15 +354,83 @@ def _public_instances() -> list[object]:
         SubmissionPlan(
             schema_version="1.0",
             plan_id="plan-1",
+            submission_key="fixture-key",
             plan_hash=HASH_A,
+            policy_hash=HASH_B,
             instance_id="crn:test",
+            instance_plan_type="open",
             backend_name="ibm_test",
+            target_hash=HASH_A,
+            compiler_target_hash=HASH_B,
             primitive="sampler",
             pubs=[sampler_pub],
+            pub_shapes=[
+                PubShape(
+                    schema_version="1.0",
+                    pub_id="sampler-0",
+                    parameter_shape=[1],
+                    observable_shape=None,
+                    result_shape=[1],
+                    circuit_executions=1,
+                )
+            ],
             resolved_options={"max_execution_time": 60},
+            treatments=[],
             partitions=[partition],
+            scheduled_estimates=[
+                ScheduledPubEstimate(
+                    schema_version="1.0",
+                    pub_id="sampler-0",
+                    scheduled_circuit_seconds=0.001,
+                    conservative_cycle_seconds=0.001,
+                    circuit_executions=1,
+                    physical_circuit_executions=1,
+                    repetitions_per_execution=100,
+                    treatment_multiplier=1,
+                    estimated_qpu_seconds=2.5,
+                )
+            ],
+            total_circuit_executions=1,
             estimated_qpu_seconds=2.5,
             maximum_execution_seconds=60,
+            estimation_method="fixture",
+            estimation_version="1.0",
+            estimation_software_versions={"qiskit": "2.4.2"},
+        ),
+        PubShape(
+            schema_version="1.0",
+            pub_id="sampler-0",
+            parameter_shape=[1],
+            observable_shape=None,
+            result_shape=[1],
+            circuit_executions=1,
+        ),
+        ScheduledPubEstimate(
+            schema_version="1.0",
+            pub_id="sampler-0",
+            scheduled_circuit_seconds=0.001,
+            conservative_cycle_seconds=0.001,
+            circuit_executions=1,
+            physical_circuit_executions=1,
+            repetitions_per_execution=100,
+            treatment_multiplier=1,
+            estimated_qpu_seconds=2.5,
+        ),
+        BudgetPolicy(
+            schema_version="1.0",
+            max_estimated_qpu_seconds=60,
+            max_execution_seconds=60,
+            max_jobs=2,
+            max_pubs=10,
+            max_circuits=10,
+            max_partitions=2,
+            max_pubs_per_job=10,
+            max_shots_per_pub=1024,
+            batch_max_time_seconds=600,
+            approval_ttl_seconds=3600,
+            allowed_instance_ids=("crn:test",),
+            allowed_backends=("ibm_test",),
+            permitted_primitives=("sampler",),
         ),
         ApprovalReceipt(
             schema_version="1.0",
@@ -406,6 +479,33 @@ def _public_instances() -> list[object]:
             failed_at=NOW,
         ),
         submission_receipt,
+        ApprovedSubmission(
+            schema_version="1.0",
+            plan_hash=HASH_A,
+            estimated_qpu_seconds=2.5,
+            approval_max_qpu_seconds=60,
+            receipt=submission_receipt,
+        ),
+        UsageReconciliation(
+            schema_version="1.0",
+            plan_hash=HASH_A,
+            estimated_qpu_seconds=2.5,
+            approval_max_qpu_seconds=60,
+            actual_qpu_seconds=1.25,
+            batch_usage=BatchUsage(
+                schema_version="1.0",
+                batch_id="batch-1",
+                batch_seconds=1.25,
+                jobs=(
+                    BatchJobUsage(
+                        schema_version="1.0",
+                        job_id="job-1",
+                        quantum_seconds=1.25,
+                    ),
+                ),
+                retrieved_at=NOW,
+            ),
+        ),
         RecoveredSubmissionStatus(
             schema_version="1.0",
             receipt=submission_receipt,
@@ -673,19 +773,52 @@ def test_plan_rejects_primitive_mismatch_and_partition_drift() -> None:
         SubmissionPlan(
             schema_version="1.0",
             plan_id="plan",
+            submission_key="negative-key",
             plan_hash=HASH_A,
+            policy_hash=HASH_B,
             instance_id="crn:test",
+            instance_plan_type="open",
             backend_name="ibm_test",
+            target_hash=HASH_A,
+            compiler_target_hash=HASH_B,
             primitive="sampler",
             pubs=[estimator],
+            pub_shapes=[
+                PubShape(
+                    schema_version="1.0",
+                    pub_id="estimator-0",
+                    parameter_shape=[],
+                    observable_shape=[1],
+                    result_shape=[1],
+                    circuit_executions=1,
+                )
+            ],
             resolved_options={},
+            treatments=[],
             partitions=[
                 SubmissionPartition(
                     schema_version="1.0", partition_id="p", pub_ids=["estimator-0"]
                 )
             ],
-            estimated_qpu_seconds=0,
+            scheduled_estimates=[
+                ScheduledPubEstimate(
+                    schema_version="1.0",
+                    pub_id="estimator-0",
+                    scheduled_circuit_seconds=0.001,
+                    conservative_cycle_seconds=0.001,
+                    circuit_executions=1,
+                    physical_circuit_executions=1,
+                    repetitions_per_execution=100,
+                    treatment_multiplier=1,
+                    estimated_qpu_seconds=0.1,
+                )
+            ],
+            total_circuit_executions=1,
+            estimated_qpu_seconds=0.1,
             maximum_execution_seconds=60,
+            estimation_method="fixture",
+            estimation_version="1.0",
+            estimation_software_versions={"qiskit": "2.4.2"},
         )
 
 

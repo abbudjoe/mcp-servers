@@ -49,8 +49,8 @@ from .models import (
 from .primitives import (
     PrimitiveKind,
     PrimitiveRunner,
-    submit_estimator_pubs,
-    submit_sampler_pubs,
+    _submit_estimator_pubs_unchecked,
+    _submit_sampler_pubs_unchecked,
 )
 
 
@@ -318,6 +318,23 @@ def _submission_key_tag(submission_key: str) -> str:
 
 def _plan_tag(plan_hash: str) -> str:
     return f"qiskit-mcp-plan:{plan_hash.removeprefix('sha256:')}"
+
+
+def _runtime_submission_value(value: Any) -> Any:
+    """Remove locked-SDK Unset sentinels from canonical plan options."""
+    if value == {"$runtime_default": "Unset"}:
+        return None
+    if isinstance(value, dict):
+        resolved = {
+            key: converted
+            for key, item in value.items()
+            if key != "_VERSION"
+            and (converted := _runtime_submission_value(item)) is not None
+        }
+        return resolved
+    if isinstance(value, list):
+        return [_runtime_submission_value(item) for item in value]
+    return copy.deepcopy(value)
 
 
 def _partition_id(index: int, pub_ids: Sequence[str]) -> str:
@@ -759,7 +776,9 @@ class BatchLifecycle:
         submission_key: str,
         partition_id: str,
     ) -> dict[str, Any]:
-        options = copy.deepcopy(plan.resolved_options)
+        options = _runtime_submission_value(plan.resolved_options)
+        if not isinstance(options, dict):  # pragma: no cover - model invariant
+            raise BatchContractError("resolved_options must materialize to an object")
         options["max_execution_time"] = int(plan.maximum_execution_seconds)
         environment = options.get("environment", {})
         if not isinstance(environment, dict):
@@ -780,7 +799,7 @@ class BatchLifecycle:
         options["environment"] = environment
         return options
 
-    def submit_plan(
+    def _submit_resolved_plan(
         self,
         batch_id: str,
         plan: SubmissionPlan,
@@ -789,7 +808,7 @@ class BatchLifecycle:
         limits: BatchExecutionLimits,
         duplicate_policy: DuplicatePolicy = "reject",
     ) -> BatchSubmissionReceipt:
-        """Submit every partition once and return immutable success/failure evidence."""
+        """Internal post-approval submit primitive used by the W1-08 boundary."""
         if _VALID_SUBMISSION_KEY.fullmatch(submission_key) is None:
             raise BatchContractError(
                 "submission_key must be 1-256 deterministic URL-safe characters"
@@ -855,13 +874,13 @@ class BatchLifecycle:
                     ),
                 )
                 if plan.primitive == "sampler":
-                    submitted = submit_sampler_pubs(
+                    submitted = _submit_sampler_pubs_unchecked(
                         runner,
                         cast(Sequence[SamplerPubSpec], partition_pubs),
                         sink=self._sink,
                     )
                 else:
-                    submitted = submit_estimator_pubs(
+                    submitted = _submit_estimator_pubs_unchecked(
                         runner,
                         cast(Sequence[EstimatorPubSpec], partition_pubs),
                         sink=self._sink,

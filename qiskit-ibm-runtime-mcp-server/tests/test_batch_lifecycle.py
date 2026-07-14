@@ -34,7 +34,9 @@ from qiskit_ibm_runtime_mcp_server.core import (
     LocalArtifactCAS,
     PauliObservables,
     PubExecutionEstimate,
+    PubShape,
     SamplerPubSpec,
+    ScheduledPubEstimate,
     SubmissionPlan,
     SubmissionReceiptRegistry,
     ingest_circuit,
@@ -101,18 +103,53 @@ def _plan(
     return SubmissionPlan(
         schema_version="1.0",
         plan_id="plan-w1-07",
+        submission_key="w1-07-key",
         plan_hash=PLAN_HASH,
+        policy_hash=f"sha256:{'6' * 64}",
         instance_id="crn:test",
+        instance_plan_type="open",
         backend_name="ibm_test",
+        target_hash=f"sha256:{'5' * 64}",
+        compiler_target_hash=f"sha256:{'4' * 64}",
         primitive="sampler",
         pubs=pubs,
+        pub_shapes=[
+            PubShape(
+                schema_version="1.0",
+                pub_id=pub_id,
+                parameter_shape=[],
+                observable_shape=None,
+                result_shape=[],
+                circuit_executions=1,
+            )
+            for pub_id, _ in values
+        ],
         resolved_options={
             "max_execution_time": limits.max_execution_seconds_per_job,
             "environment": {"job_tags": ["caller-tag"]},
         },
+        treatments=[],
         partitions=list(partitions),
+        scheduled_estimates=[
+            ScheduledPubEstimate(
+                schema_version="1.0",
+                pub_id=pub_id,
+                scheduled_circuit_seconds=0.001,
+                conservative_cycle_seconds=0.001,
+                circuit_executions=1,
+                physical_circuit_executions=1,
+                repetitions_per_execution=16,
+                treatment_multiplier=1,
+                estimated_qpu_seconds=seconds,
+            )
+            for pub_id, seconds in values
+        ],
+        total_circuit_executions=len(values),
         estimated_qpu_seconds=sum(seconds for _, seconds in values),
         maximum_execution_seconds=limits.max_execution_seconds_per_job,
+        estimation_method="fixture",
+        estimation_version="1.0",
+        estimation_software_versions={"qiskit": "2.4.2"},
     )
 
 
@@ -136,15 +173,48 @@ def _estimator_plan(
     return SubmissionPlan(
         schema_version="1.0",
         plan_id="plan-w1-07-estimator",
+        submission_key="w1-07-estimator-key",
         plan_hash=PLAN_HASH,
+        policy_hash=f"sha256:{'6' * 64}",
         instance_id="crn:test",
+        instance_plan_type="open",
         backend_name="ibm_test",
+        target_hash=f"sha256:{'5' * 64}",
+        compiler_target_hash=f"sha256:{'4' * 64}",
         primitive="estimator",
         pubs=[pub],
+        pub_shapes=[
+            PubShape(
+                schema_version="1.0",
+                pub_id=pub.pub_id,
+                parameter_shape=[],
+                observable_shape=[1],
+                result_shape=[1],
+                circuit_executions=1,
+            )
+        ],
         resolved_options={"max_execution_time": limits.max_execution_seconds_per_job},
+        treatments=[],
         partitions=list(partitions),
+        scheduled_estimates=[
+            ScheduledPubEstimate(
+                schema_version="1.0",
+                pub_id=pub.pub_id,
+                scheduled_circuit_seconds=0.001,
+                conservative_cycle_seconds=0.001,
+                circuit_executions=1,
+                physical_circuit_executions=1,
+                repetitions_per_execution=100,
+                treatment_multiplier=1,
+                estimated_qpu_seconds=1,
+            )
+        ],
+        total_circuit_executions=1,
         estimated_qpu_seconds=1,
         maximum_execution_seconds=limits.max_execution_seconds_per_job,
+        estimation_method="fixture",
+        estimation_version="1.0",
+        estimation_software_versions={"qiskit": "2.4.2"},
     )
 
 
@@ -480,7 +550,7 @@ def test_reattached_lower_effective_ttl_rebounds_submission(tmp_path: Path) -> N
     plan = _plan(sink, limits)
     reference = lifecycle.open_batch("batch-1", expected_backend_name="ibm_test")
 
-    receipt = lifecycle.submit_plan(
+    receipt = lifecycle._submit_resolved_plan(
         reference.batch_id,
         plan,
         submission_key="lower-effective-ttl",
@@ -492,7 +562,7 @@ def test_reattached_lower_effective_ttl_rebounds_submission(tmp_path: Path) -> N
     assert len(primitive_factory.run_calls) == 2
     oversized = _plan(sink, limits, (("pub-x", 3), ("pub-y", 3)))
     with pytest.raises(BatchLimitError, match="effective Batch TTL"):
-        lifecycle.submit_plan(
+        lifecycle._submit_resolved_plan(
             reference.batch_id,
             oversized,
             submission_key="too-large-for-effective-ttl",
@@ -508,7 +578,7 @@ def test_submission_returns_immutable_complete_receipt_and_enforced_tags(
     plan = _plan(sink, limits)
     lifecycle.create_batch("ibm_test", limits)
 
-    receipt = lifecycle.submit_plan(
+    receipt = lifecycle._submit_resolved_plan(
         "batch-1",
         plan,
         submission_key="submission-001",
@@ -549,7 +619,7 @@ def test_estimator_partitions_use_the_same_batch_receipt_contract(
     limits = _limits()
     lifecycle.create_batch("ibm_test", limits)
 
-    receipt = lifecycle.submit_plan(
+    receipt = lifecycle._submit_resolved_plan(
         "batch-1",
         _estimator_plan(sink, limits),
         submission_key="estimator-key",
@@ -569,12 +639,12 @@ def test_duplicate_submission_key_is_refused_before_a_second_primitive_call(
     limits = _limits()
     plan = _plan(sink, limits)
     lifecycle.create_batch("ibm_test", limits)
-    first = lifecycle.submit_plan(
+    first = lifecycle._submit_resolved_plan(
         "batch-1", plan, submission_key="duplicate-key", limits=limits
     )
 
     with pytest.raises(DuplicateSubmissionError, match="no second live submission"):
-        lifecycle.submit_plan(
+        lifecycle._submit_resolved_plan(
             "batch-1", plan, submission_key="duplicate-key", limits=limits
         )
 
@@ -613,7 +683,7 @@ def test_remote_live_duplicate_is_refused_after_local_registry_loss(
     lifecycle.create_batch("ibm_test", limits)
 
     with pytest.raises(DuplicateSubmissionError, match="remote jobs"):
-        lifecycle.submit_plan(
+        lifecycle._submit_resolved_plan(
             "batch-1", plan, submission_key="restart-key", limits=limits
         )
 
@@ -627,9 +697,11 @@ def test_explicit_allow_live_policy_is_the_only_live_duplicate_override(
     limits = _limits()
     plan = _plan(sink, limits, (("pub-a", 1),))
     lifecycle.create_batch("ibm_test", limits)
-    lifecycle.submit_plan("batch-1", plan, submission_key="override-key", limits=limits)
+    lifecycle._submit_resolved_plan(
+        "batch-1", plan, submission_key="override-key", limits=limits
+    )
 
-    second = lifecycle.submit_plan(
+    second = lifecycle._submit_resolved_plan(
         "batch-1",
         plan,
         submission_key="override-key",
@@ -648,14 +720,14 @@ def test_allow_if_terminal_accepts_real_locked_job_status_enums(
     limits = _limits()
     plan = _plan(sink, limits, (("pub-a", 1),))
     lifecycle.create_batch("ibm_test", limits)
-    first = lifecycle.submit_plan(
+    first = lifecycle._submit_resolved_plan(
         "batch-1", plan, submission_key="terminal-key", limits=limits
     )
     first_job = primitive_factory.jobs[0]
     first_job._status = JobStatus.DONE
     service.jobs_by_id[first.jobs[0].job_id] = first_job
 
-    second = lifecycle.submit_plan(
+    second = lifecycle._submit_resolved_plan(
         "batch-1",
         plan,
         submission_key="terminal-key",
@@ -681,7 +753,7 @@ def test_remote_terminal_enum_allows_explicit_terminal_override(
     plan = _plan(sink, limits, (("pub-a", 1),))
     lifecycle.create_batch("ibm_test", limits)
 
-    receipt = lifecycle.submit_plan(
+    receipt = lifecycle._submit_resolved_plan(
         "batch-1",
         plan,
         submission_key=f"terminal-{status.name.lower()}",
@@ -719,7 +791,7 @@ def test_partial_failure_receipt_and_status_recovery_preserve_accepted_jobs(
     plan = _plan(sink, limits)
     lifecycle.create_batch("ibm_test", limits)
 
-    receipt = lifecycle.submit_plan(
+    receipt = lifecycle._submit_resolved_plan(
         "batch-1", plan, submission_key="partial-key", limits=limits
     )
     accepted = primitive_factory.jobs[0]
@@ -763,7 +835,7 @@ def test_submission_rejects_unhashed_execution_option_drift(tmp_path: Path) -> N
     lifecycle.create_batch("ibm_test", limits)
 
     with pytest.raises(BatchContractError, match="must exactly match"):
-        lifecycle.submit_plan(
+        lifecycle._submit_resolved_plan(
             "batch-1", plan, submission_key="drift-key", limits=limits
         )
 
@@ -779,7 +851,7 @@ def test_submission_rejects_fractional_sdk_execution_timeout(tmp_path: Path) -> 
     lifecycle.create_batch("ibm_test", limits)
 
     with pytest.raises(BatchContractError, match="must be an integer"):
-        lifecycle.submit_plan(
+        lifecycle._submit_resolved_plan(
             "batch-1", plan, submission_key="fractional-key", limits=limits
         )
 
