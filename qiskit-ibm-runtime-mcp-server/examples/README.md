@@ -38,7 +38,7 @@ The agent can:
 - List and manage quantum jobs
 
 Direct Sampler/Estimator MCP submission tools are deprecated non-submitting
-compatibility stubs in 0.7.0. Experiment execution must use the typed
+compatibility stubs in 0.7.x. Experiment execution must use the typed
 plan/approval API documented in `../docs/API.md`.
 
 ### Supported LLM Providers

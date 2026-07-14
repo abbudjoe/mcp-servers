@@ -18,6 +18,7 @@ import io
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import Mock, patch
 
@@ -54,6 +55,7 @@ from qiskit_ibm_runtime_mcp_server.core.primitives import (
     _submit_estimator_pubs_unchecked,
     _submit_sampler_pubs_unchecked,
 )
+from qiskit_ibm_runtime_mcp_server.core import primitives as primitive_module
 
 
 FIXTURES = Path(__file__).with_name("fixtures") / "primitive_v2"
@@ -90,6 +92,122 @@ class RecordingPrimitive:
     def run(self, pubs: list[Any]) -> object:
         self.calls.append(pubs)
         return self.job
+
+
+def test_primitive_parser_rejects_invalid_envelope_boundaries(tmp_path: Path) -> None:
+    """Envelope identity, count, threshold, and primitive checks fail early."""
+    sink = LocalArtifactCAS(tmp_path / "cas")
+    empty = PrimitiveResult([], metadata={})
+    cases = (
+        ({"primitive": "unsupported"}, object(), "unsupported primitive kind"),
+        ({"threshold_bytes": -1}, object(), "threshold_bytes"),
+        (
+            {"pub_ids": (), "expected_pub_shapes": ((),)},
+            empty,
+            "identities and expected shapes",
+        ),
+        (
+            {"pub_ids": ("one",), "expected_pub_shapes": ((),)},
+            empty,
+            "returned 0 PUBs",
+        ),
+        (
+            {
+                "pub_ids": ("duplicate", "duplicate"),
+                "expected_pub_shapes": ((), ()),
+            },
+            [object(), object()],
+            "pub_id values must be unique",
+        ),
+    )
+    defaults: dict[str, Any] = {
+        "primitive": "sampler",
+        "pub_ids": (),
+        "expected_pub_shapes": (),
+        "job_id": "job",
+        "backend_name": "backend",
+        "sink": sink,
+        "threshold_bytes": 1024,
+    }
+    for overrides, result, message in cases:
+        with pytest.raises(PrimitiveContractError, match=message):
+            parse_primitive_result(result, **(defaults | overrides))
+
+
+def test_primitive_helper_error_branches_are_fail_closed(tmp_path: Path) -> None:
+    """Metadata, shaped values, PUB identity, and artifact flattening are guarded."""
+    sink = LocalArtifactCAS(tmp_path / "cas")
+    with pytest.raises(PrimitiveContractError, match="at least one PUB"):
+        primitive_module._require_unique_pubs([])  # noqa: SLF001
+    duplicate = [SimpleNamespace(pub_id="same"), SimpleNamespace(pub_id="same")]
+    with pytest.raises(PrimitiveContractError, match="must be unique"):
+        primitive_module._require_unique_pubs(duplicate)  # type: ignore[arg-type] # noqa: SLF001
+
+    with pytest.raises(TypeError, match="keys must be strings"):
+        primitive_module._metadata_json(  # noqa: SLF001
+            {1: "value"}, sink=sink, threshold_bytes=1024
+        )
+    assert primitive_module._metadata_json(  # noqa: SLF001
+        ("a", ["b"]), sink=sink, threshold_bytes=1024
+    ) == ["a", ["b"]]
+    with pytest.raises(PrimitiveContractError, match="metadata must be a JSON object"):
+        primitive_module._safe_metadata(  # noqa: SLF001
+            "not-an-object", name="test", sink=sink, threshold_bytes=1024
+        )
+    with pytest.raises(PrimitiveContractError, match="homogeneous"):
+        primitive_module._shaped_result(  # noqa: SLF001
+            np.asarray([object()], dtype=object),
+            sink=sink,
+            threshold_bytes=1024,
+            kind="object-array",
+        )
+
+    artifact_value = primitive_module._artifact_value(  # noqa: SLF001
+        np.arange(32), sink=sink, threshold_bytes=0, kind="forced-artifact"
+    )
+    with pytest.raises(PrimitiveContractError, match="artifact-backed"):
+        primitive_module.inline_value(artifact_value)
+    inline = primitive_module._artifact_value(  # noqa: SLF001
+        "small", sink=sink, threshold_bytes=1024, kind="inline-value"
+    )
+    assert primitive_module.inline_value(inline) == "small"
+
+
+def test_estimator_parser_rejects_missing_or_misaligned_fields(tmp_path: Path) -> None:
+    """Estimator DataBins require values, uncertainty, and aligned shapes."""
+    sink = LocalArtifactCAS(tmp_path / "cas")
+
+    def pub_result(shape: tuple[int, ...], **fields: Any) -> Any:
+        data = SimpleNamespace(shape=shape, items=lambda: fields.items())
+        return SimpleNamespace(data=data, metadata={})
+
+    with pytest.raises(PrimitiveContractError, match="missing required DataBin key"):
+        primitive_module._parse_estimator_pub(  # noqa: SLF001
+            pub_result(()),
+            pub_id="missing",
+            pub_index=0,
+            expected_shape=(),
+            sink=sink,
+            threshold_bytes=1024,
+        )
+    with pytest.raises(PrimitiveContractError, match="neither stds"):
+        primitive_module._parse_estimator_pub(  # noqa: SLF001
+            pub_result((), evs=np.asarray(0.5)),
+            pub_id="no-error",
+            pub_index=0,
+            expected_shape=(),
+            sink=sink,
+            threshold_bytes=1024,
+        )
+    with pytest.raises(PrimitiveContractError, match="shapes must match"):
+        primitive_module._parse_estimator_pub(  # noqa: SLF001
+            pub_result((2,), evs=np.asarray([0.5]), stds=np.asarray([0.1])),
+            pub_id="misaligned",
+            pub_index=0,
+            expected_shape=(2,),
+            sink=sink,
+            threshold_bytes=1024,
+        )
 
 
 def test_sampler_scalar_vector_and_multidimensional_pubs_are_coerced_in_order(

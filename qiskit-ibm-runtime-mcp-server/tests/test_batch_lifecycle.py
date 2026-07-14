@@ -102,8 +102,8 @@ def _plan(
     partitions = plan_batch_partitions(_estimates(values), limits)
     return SubmissionPlan(
         schema_version="1.0",
-        plan_id="plan-w1-07",
-        submission_key="w1-07-key",
+        plan_id="plan-batch-lifecycle",
+        submission_key="batch-lifecycle-key",
         plan_hash=PLAN_HASH,
         policy_hash=f"sha256:{'6' * 64}",
         instance_id="crn:test",
@@ -172,8 +172,8 @@ def _estimator_plan(
     partitions = plan_batch_partitions(_estimates((("estimator-a", 1),)), limits)
     return SubmissionPlan(
         schema_version="1.0",
-        plan_id="plan-w1-07-estimator",
-        submission_key="w1-07-estimator-key",
+        plan_id="plan-batch-estimator",
+        submission_key="batch-estimator-key",
         plan_hash=PLAN_HASH,
         policy_hash=f"sha256:{'6' * 64}",
         instance_id="crn:test",

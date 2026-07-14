@@ -180,7 +180,7 @@ def test_qpy_round_trip_and_format_version() -> None:
         "annotation_factories",
     )
 
-    original = QuantumCircuit(2, name="w1-01", metadata={"source": "guard"})
+    original = QuantumCircuit(2, name="canonical-guard", metadata={"source": "guard"})
     original.h(0)
     original.cx(0, 1)
     payload = io.BytesIO()
@@ -225,7 +225,7 @@ def test_runtime_options_public_shape() -> None:
 
 def test_fastmcp_public_registration_and_listing_apis() -> None:
     """Guard only documented FastMCP APIs; private managers are unsupported."""
-    server = FastMCP("w1-01-guard")
+    server = FastMCP("canonical-stack-guard")
 
     @server.tool
     def add(left: int, right: int) -> int:

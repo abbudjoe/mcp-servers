@@ -8,9 +8,9 @@ obtain a copy of this license in the LICENSE file in the root directory
 of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 -->
 
-# Migrating from 0.6.x to 0.7.0
+# Migrating from 0.6.x to 0.7.x
 
-Release 0.7.0 intentionally breaks implicit live-execution and flattened-result
+Release 0.7.x intentionally breaks implicit live-execution and flattened-result
 contracts. Migrate the control plane before moving experiment code.
 
 ## Authentication and instance ownership
@@ -64,6 +64,6 @@ inline. Runtime execution-span masks follow this rule as of 0.7.0.
 
 ## Schemas
 
-The 0.7.0 package uses wire-schema version `1.0`. Validate persisted inputs at
+The 0.7.x package uses wire-schema version `1.0`. Validate persisted inputs at
 ingress and preserve unknown extension fields. Package upgrades do not imply a
 schema upgrade, and schema upgrades require separate compatibility review.

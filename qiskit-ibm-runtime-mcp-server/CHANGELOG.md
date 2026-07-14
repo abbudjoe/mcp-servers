@@ -13,6 +13,17 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 All notable changes to `qiskit-ibm-runtime-mcp-server` are documented here.
 Package versions and JSON wire-schema versions are independent.
 
+## 0.7.1 — 2026-07-14
+
+### Changed
+
+- Added behavior-focused regressions and an enforced per-module branch-coverage
+  gate for budgeting, approval consumption, primitive parsing, and secret
+  handling. Each safety-critical module must remain at or above 90% branch
+  coverage on every supported Python version.
+- Replaced workstream-specific test fixture identifiers with generic contract
+  names. Runtime APIs and wire-schema version `1.0` are unchanged from 0.7.0.
+
 ## 0.7.0 — 2026-07-14
 
 ### Added

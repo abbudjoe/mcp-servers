@@ -13,8 +13,10 @@
 """Registration and negative-security tests for the research profile."""
 
 import inspect
+import io
 import logging
 import os
+import sys
 from unittest.mock import patch
 
 import pytest
@@ -27,6 +29,7 @@ from qiskit_ibm_runtime_mcp_server.profiles import (
 )
 from qiskit_ibm_runtime_mcp_server.security import (
     REDACTED,
+    SecretRedactionFilter,
     install_secret_redaction,
     redact_data,
     redact_text,
@@ -168,6 +171,55 @@ def test_secret_redaction_covers_strings_and_nested_fields() -> None:
     assert data["account"]["client_secret"] == REDACTED
     assert data["account"]["refresh-token"] == REDACTED
     assert REDACTED in data["message"]
+
+
+def test_secret_redaction_covers_tuples_and_exception_records() -> None:
+    """Tuple payloads and exception text use the same redaction boundary."""
+    sensitive_value = "sensitive-" + ("t" * 32)
+    redacted_tuple = redact_data((f"token={sensitive_value}", {"api_key": "x"}))
+    assert sensitive_value not in str(redacted_tuple)
+    assert redacted_tuple[1]["api_key"] == REDACTED
+
+    try:
+        raise ValueError(f"token={sensitive_value}")
+    except ValueError:
+        exc_info = sys.exc_info()
+    record = logging.LogRecord(
+        "runtime-security-exception",
+        logging.ERROR,
+        __file__,
+        1,
+        "failed",
+        (),
+        exc_info,
+    )
+    assert SecretRedactionFilter().filter(record)
+    assert record.exc_info is not None
+    assert sensitive_value not in str(record.exc_info[1])
+
+    empty_exception = logging.LogRecord(
+        "runtime-security-empty-exception",
+        logging.ERROR,
+        __file__,
+        1,
+        "failed",
+        (),
+        (RuntimeError, None, None),
+    )
+    assert SecretRedactionFilter().filter(empty_exception)
+
+
+def test_secret_redaction_installation_is_idempotent_for_handlers() -> None:
+    """Repeated installation adds one filter per logger and handler."""
+    logger = logging.Logger("runtime-security-idempotent")
+    handler = logging.StreamHandler(io.StringIO())
+    logger.addHandler(handler)
+
+    install_secret_redaction(logger)
+    install_secret_redaction(logger)
+
+    assert sum(isinstance(item, SecretRedactionFilter) for item in logger.filters) == 1
+    assert sum(isinstance(item, SecretRedactionFilter) for item in handler.filters) == 1
 
 
 def test_secret_redaction_filter_sanitizes_logs(

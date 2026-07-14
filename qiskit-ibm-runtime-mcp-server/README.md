@@ -5,7 +5,7 @@
 <!-- mcp-name: io.github.Qiskit/qiskit-ibm-runtime-mcp-server -->
 
 An MCP server and typed Python wrapper for reproducible IBM Quantum Runtime
-research workflows. Release 0.7.0 adds explicit resource ownership, immutable
+research workflows. Release 0.7.1 adds explicit resource ownership, immutable
 plans and approvals, exact circuit boundaries, complete Primitive V2 PUB/result
 contracts, Batch lifecycle receipts, and content-addressed artifacts.
 
@@ -29,11 +29,11 @@ Published releases can be installed with:
 pip install qiskit-ibm-runtime-mcp-server
 ```
 
-The experiment-ready 0.7.0 wrapper is also available from its immutable release
+The experiment-ready 0.7.1 wrapper is also available from its immutable release
 tag:
 
 ```text
-qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.0#subdirectory=qiskit-ibm-runtime-mcp-server
+qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.1#subdirectory=qiskit-ibm-runtime-mcp-server
 ```
 
 Supported Python versions are 3.10 through 3.14. The canonical tested research
@@ -83,7 +83,7 @@ non-submitting example. Existing 0.6.x users should read
 
 Every public control/data model has a checked-in draft 2020-12 JSON Schema under
 `src/qiskit_ibm_runtime_mcp_server/core/json_schemas/v1.0/`. Package version and
-wire-schema version advance independently. Release 0.7.0 uses schema version
+wire-schema version advance independently. Release 0.7.1 uses schema version
 `1.0` for results, plans, budget policies, approvals, batches, artifacts,
 circuits, and snapshots.
 

@@ -8,21 +8,21 @@ obtain a copy of this license in the LICENSE file in the root directory
 of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 -->
 
-# Experiment Compatibility — Runtime Research 0.7.0
+# Experiment Compatibility — Runtime Research 0.7.1
 
 This document is the Workstream 2 handoff contract for the immutable
-`runtime-research-v0.7.0` release.
+`runtime-research-v0.7.1` release.
 
 ## Exact dependency pin
 
 Use this PEP 508 requirement; do not depend on a branch:
 
 ```text
-qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.0#subdirectory=qiskit-ibm-runtime-mcp-server
+qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.1#subdirectory=qiskit-ibm-runtime-mcp-server
 ```
 
 Expected installed distribution/version:
-`qiskit-ibm-runtime-mcp-server==0.7.0`.
+`qiskit-ibm-runtime-mcp-server==0.7.1`.
 
 ## Runtime environment
 

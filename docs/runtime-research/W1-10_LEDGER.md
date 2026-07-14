@@ -20,7 +20,7 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 - Target contract: an immutable, clean-installable Runtime wrapper release with
   versioned schemas, an exact Workstream 2 dependency pin, and a generic,
   dependency-ordered upstream contribution series
-- Status: `review-pending`
+- Status: `review-failed`
 - Live-compute policy: no QPU submission or paid-compute mutation is authorized
   or required for this workstream
 
@@ -29,14 +29,14 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 | DoD item | Status | Planned evidence |
 |---|---|---|
 | Resolve every W1-09 smoke finding. | met | Provider tag limit and ordered-submit failures were fixed before W1-09; live `ExecutionSpans` serialization is covered; release commit `d6de645` adds threshold-backed masks. Focused release smoke: 44 passed; plan/security/result smoke: 74 passed. The three docs integration cases remain an explicit read-only network gate, not ordinary tokenless CI. |
-| Run clean-install, package-build, full CI, security, and schema-compatibility gates. | met | Wheel and sdist builds plus isolated installs passed. Canonical lock/schema gates passed. Runtime passed on Python 3.10–3.14 (362 passed, 1 skipped per interpreter); qiskit and docs passed on 3.10–3.14 (103 and 173 passed per interpreter); transpiler and gym passed on 3.10–3.13 (139 and 97 passed per interpreter). Ruff, format, strict mypy, and Bandit passed for all five packages with zero Bandit findings. |
+| Run clean-install, package-build, full CI, security, and schema-compatibility gates. | partial | The 0.7.0 gates passed, but final review found the supporting 90% safety branch-coverage contract was not enforced. The 0.7.1 candidate now enforces it and passes locally (approval 100%, budgeting 91.07%, parsing 90.91%, secret handling 100%); clean build/install and supported-version reruns remain pending. |
 | Update version, changelog, migration guide, README, API docs, and generic examples. | met | Runtime 0.7.0, meta-package 0.12.0, `CHANGELOG.md`, `MIGRATION.md`, rewritten Runtime README, `docs/API.md`, and offline `examples/research_contracts.py`; example executed successfully and exported all 35 schemas. |
 | Tag the exact tested commit and record lock/package hashes. | met | Annotated tag `runtime-research-v0.7.0` peels to tested commit `a24f67a869a7f9279f98440b21214987e14f3c42`; the annotation and release manifest record the lock, wheel, and sdist hashes. |
 | Make the pinned release accessible to Workstream 2. | met | The tag is published at `https://github.com/abbudjoe/mcp-servers.git`; an isolated Python 3.12 install from the exact tag resolved to the tested commit and verified package `0.7.0`, all 35 schemas, and empty execution-span serialization. |
 | Publish an experiment compatibility document. | met | `qiskit-ibm-runtime-mcp-server/docs/EXPERIMENT_COMPATIBILITY.md` records import paths, Python/stack requirements, environment variables, schema versions, modes, limitations, exact tag pin, and 4-second W1-09 usage. |
-| Split upstreamable changes into dependency-ordered PRs without experiment-specific content. | met | Ten cumulative draft PRs based on upstream `8c1abce` are published to the fork as PRs 1–10. Each PR is one commit over its predecessor; added-line and whole-tip audits reject workstream IDs, experiment tag/pin text, fork URLs, and the experiment-specific schema namespace. See `W1-10_UPSTREAM_SERIES.md`. |
-| Independent spec-conformance review is clean. | pending | Final assembly reviewer audit requested after the immutable tag, remote pin install, and upstream series publication. |
-| Provide the exact Workstream 2 dependency pin. | met | `qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.0#subdirectory=qiskit-ibm-runtime-mcp-server` |
+| Split upstreamable changes into dependency-ordered PRs without experiment-specific content. | partial | Final review found three workstream fixture IDs and version-inconsistent PR 10 docs. Generic fixture names are fixed locally; the stack must be rebuilt and force-pushed with version-neutral docs. |
+| Independent spec-conformance review is clean. | partial | Final audit correctly failed on safety branch coverage and upstream-series content. Rereview is required after 0.7.1 publication and PR restacking. |
+| Provide the exact Workstream 2 dependency pin. | partial | Candidate pin: `qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.1#subdirectory=qiskit-ibm-runtime-mcp-server`; publication and remote install verification remain pending. |
 
 ## Gate evidence
 

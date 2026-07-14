@@ -8,7 +8,7 @@ obtain a copy of this license in the LICENSE file in the root directory
 of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 -->
 
-# Runtime Research API 0.7.0
+# Runtime Research API 0.7.x
 
 The supported Python contract lives under
 `qiskit_ibm_runtime_mcp_server.core`. Private names and the unchecked primitive
@@ -79,7 +79,7 @@ stops on the first failed or empty receipt.
 - `schemas_directory()` for packaged checked-in schemas;
 - `export_json_schemas(destination)` for explicit export.
 
-All 0.7.0 public models use schema version `1.0` and JSON Schema draft 2020-12.
+All 0.7.x public models use schema version `1.0` and JSON Schema draft 2020-12.
 
 ## MCP surface
 
