@@ -37,6 +37,19 @@ Package versions and JSON wire-schema versions are independent.
   lossy flattened counts/value responses.
 - Large Runtime execution-span masks honor the result artifact threshold.
 
+### Fixed
+
+- Replaced raw restart inventory with plan-bound `SubmissionRecovery` and
+  `RecoveredJobReceipt` contracts. Recovery now requires the exact persisted
+  `SubmissionPlan`, validates its canonical hash and remote identity tags,
+  restores ordered plan/partition/PUB/job identity, and returns a required
+  wrapper-owned UTC pre-submit timestamp. Nullable provider creation time is
+  retained only as optional corroboration.
+- Added fail-closed checks for submission-key drift, reserved-tag spoofing,
+  missing or contradictory recovery tags, duplicate or gapped partitions,
+  duplicate job IDs, jobs spanning multiple Runtime batches, and the provider
+  tag-count limit.
+
 ### Deprecated
 
 - Direct Sampler/Estimator MCP submission tools remain discoverable only as
@@ -47,3 +60,6 @@ Package versions and JSON wire-schema versions are independent.
 - Python: 3.10–3.14; canonical release evidence: Python 3.12.
 - Wire schemas: `1.0`.
 - Canonical stack: Qiskit 2.4.2, qiskit-ibm-runtime 0.45.1, FastMCP 3.4.4.
+- Jobs created before the wrapper submission-time tag was introduced cannot
+  satisfy typed crash recovery. Preserve their original local receipts; do not
+  infer missing timestamps from nullable provider metadata.

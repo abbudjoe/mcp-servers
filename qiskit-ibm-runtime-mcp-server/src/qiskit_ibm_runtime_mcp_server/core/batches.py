@@ -40,9 +40,10 @@ from .models import (
     BatchUsage,
     EstimatorPubSpec,
     PubExecutionEstimate,
+    RecoveredJobReceipt,
     RecoveredSubmissionStatus,
     SamplerPubSpec,
-    SubmissionKeyStatus,
+    SubmissionRecovery,
     SubmissionPartition,
     SubmissionPlan,
 )
@@ -57,7 +58,12 @@ from .primitives import (
 DuplicatePolicy = Literal["reject", "allow_if_terminal", "allow_live"]
 _VALID_SUBMISSION_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$")
 _RUNTIME_JOB_TAG_MAX_CHARACTERS = 86
+_RUNTIME_JOB_TAG_MAX_ITEMS = 8
+_INTERNAL_TAG_PREFIX = "qiskit-mcp-"
 _IDEMPOTENCY_TAG_PREFIX = "qiskit-mcp-idempotency:"
+_PLAN_TAG_PREFIX = "qiskit-mcp-plan:"
+_PARTITION_TAG_PREFIX = "qiskit-mcp-partition:"
+_SUBMISSION_ATTEMPTED_AT_TAG_PREFIX = "qiskit-mcp-attempted-at:"
 _TERMINAL_JOB_STATES = frozenset({"DONE", "ERROR", "CANCELLED"})
 _KNOWN_JOB_STATES = frozenset(
     {
@@ -80,6 +86,10 @@ class BatchLimitError(BatchContractError):
 
 class DuplicateSubmissionError(BatchContractError):
     """Raised before submission when an idempotency key is already owned."""
+
+
+class BatchRecoveryError(BatchContractError):
+    """Raised when remote evidence cannot safely reconstruct job receipts."""
 
 
 class BatchHandle(Protocol):
@@ -322,7 +332,58 @@ def _submission_key_tag(submission_key: str) -> str:
 
 
 def _plan_tag(plan_hash: str) -> str:
-    return f"qiskit-mcp-plan:{plan_hash.removeprefix('sha256:')}"
+    return f"{_PLAN_TAG_PREFIX}{plan_hash.removeprefix('sha256:')}"
+
+
+def _submission_attempt_time_tag(attempted_at: datetime) -> str:
+    if attempted_at.tzinfo is None or attempted_at.utcoffset() is None:
+        raise BatchContractError(
+            "submission clock must return a timezone-aware datetime"
+        )
+    encoded = attempted_at.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
+    return f"{_SUBMISSION_ATTEMPTED_AT_TAG_PREFIX}{encoded}"
+
+
+def _submission_attempted_at_from_tags(tags: Sequence[str]) -> datetime:
+    matches = [
+        tag for tag in tags if tag.startswith(_SUBMISSION_ATTEMPTED_AT_TAG_PREFIX)
+    ]
+    if len(matches) != 1:
+        raise BatchRecoveryError(
+            "remote job must contain exactly one wrapper submission-attempt tag"
+        )
+    encoded = matches[0].removeprefix(_SUBMISSION_ATTEMPTED_AT_TAG_PREFIX)
+    try:
+        return datetime.strptime(encoded, "%Y%m%dT%H%M%S.%fZ").replace(
+            tzinfo=timezone.utc
+        )
+    except ValueError as exc:
+        raise BatchRecoveryError(
+            "remote job contains an invalid wrapper submission-attempt tag"
+        ) from exc
+
+
+def _provider_creation_date(job: Any) -> datetime | None:
+    candidate = getattr(job, "creation_date", None)
+    value = candidate() if callable(candidate) else candidate
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        created_at = value
+    elif isinstance(value, str):
+        try:
+            created_at = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise BatchRecoveryError(
+                "remote job has an invalid provider creation_date"
+            ) from exc
+    else:
+        raise BatchRecoveryError("remote job has an invalid provider creation_date")
+    if created_at.tzinfo is None or created_at.utcoffset() is None:
+        raise BatchRecoveryError(
+            "remote job provider creation_date must be timezone-aware"
+        )
+    return created_at.astimezone(timezone.utc)
 
 
 def _runtime_submission_value(value: Any) -> Any:
@@ -780,6 +841,7 @@ class BatchLifecycle:
         plan: SubmissionPlan,
         submission_key: str,
         partition_id: str,
+        submission_attempted_at: datetime,
     ) -> dict[str, Any]:
         options = _runtime_submission_value(plan.resolved_options)
         if not isinstance(options, dict):  # pragma: no cover - model invariant
@@ -795,12 +857,25 @@ class BatchLifecycle:
             raise BatchContractError(
                 "resolved_options.environment.job_tags must be strings"
             )
+        reserved_tags = [
+            tag for tag in raw_tags if tag.startswith(_INTERNAL_TAG_PREFIX)
+        ]
+        if reserved_tags:
+            raise BatchContractError(
+                "caller job tags must not use the reserved qiskit-mcp- namespace"
+            )
         internal_tags = [
             _submission_key_tag(submission_key),
             _plan_tag(plan.plan_hash),
-            f"qiskit-mcp-partition:{partition_id}",
+            f"{_PARTITION_TAG_PREFIX}{partition_id}",
+            _submission_attempt_time_tag(submission_attempted_at),
         ]
         job_tags = list(dict.fromkeys([*raw_tags, *internal_tags]))
+        if len(job_tags) > _RUNTIME_JOB_TAG_MAX_ITEMS:
+            raise BatchContractError(
+                "resolved Runtime job tags must contain no more than "
+                f"{_RUNTIME_JOB_TAG_MAX_ITEMS} items"
+            )
         oversized_tags = [
             tag for tag in job_tags if len(tag) > _RUNTIME_JOB_TAG_MAX_CHARACTERS
         ]
@@ -826,6 +901,10 @@ class BatchLifecycle:
         if _VALID_SUBMISSION_KEY.fullmatch(submission_key) is None:
             raise BatchContractError(
                 "submission_key must be 1-256 deterministic URL-safe characters"
+            )
+        if plan.submission_key != submission_key:
+            raise BatchContractError(
+                "submission_key must exactly match SubmissionPlan.submission_key"
             )
         if duplicate_policy not in ("reject", "allow_if_terminal", "allow_live"):
             raise BatchContractError("unsupported duplicate submission policy")
@@ -880,11 +959,15 @@ class BatchLifecycle:
         for partition in plan.partitions:
             try:
                 partition_pubs = [pub_by_id[pub_id] for pub_id in partition.pub_ids]
+                submission_attempted_at = self._clock()
                 runner = self._primitive_factory(
                     plan.primitive,
                     batch,
                     self._submission_options(
-                        plan, submission_key, partition.partition_id
+                        plan,
+                        submission_key,
+                        partition.partition_id,
+                        submission_attempted_at,
                     ),
                 )
                 if plan.primitive == "sampler":
@@ -905,7 +988,7 @@ class BatchLifecycle:
                         partition_id=partition.partition_id,
                         job_id=_job_id(submitted.job),
                         pub_ids=tuple(partition.pub_ids),
-                        submitted_at=self._clock(),
+                        submitted_at=submission_attempted_at,
                     )
                 )
             except Exception as exc:
@@ -973,22 +1056,170 @@ class BatchLifecycle:
         )
 
     def recover_jobs_by_submission_key(
-        self, submission_key: str
-    ) -> SubmissionKeyStatus:
-        """Recover tagged jobs after process-local receipt state is unavailable."""
+        self, submission_key: str, plan: SubmissionPlan
+    ) -> SubmissionRecovery:
+        """Recover plan-bound job receipts after process-local state is lost.
+
+        Provider inventory is not treated as caller identity. The caller must supply
+        the exact persisted plan; its canonical hash binds plan, partition, and PUB
+        identity to the tags written before each primitive call.
+        """
         if _VALID_SUBMISSION_KEY.fullmatch(submission_key) is None:
             raise BatchContractError("invalid deterministic submission_key")
+        if plan.submission_key != submission_key:
+            raise BatchRecoveryError(
+                "SubmissionPlan submission_key does not match the recovery key"
+            )
+        if plan.instance_id != self._instance_id:
+            raise BatchRecoveryError(
+                "SubmissionPlan instance_id does not match the recovery lifecycle"
+            )
+        # Imported lazily because budgeting owns the canonical plan hash and imports
+        # this module for the submission boundary.
+        from .budgeting import validate_submission_plan_hash
+
+        try:
+            validate_submission_plan_hash(plan)
+        except ValueError as exc:
+            raise BatchRecoveryError(
+                "SubmissionPlan canonical hash is invalid"
+            ) from exc
+
+        partitions = {
+            partition.partition_id: partition for partition in plan.partitions
+        }
+        if len(partitions) != len(plan.partitions):
+            raise BatchRecoveryError(
+                "SubmissionPlan partition_id values must be unique"
+            )
+
         observed_at = self._clock()
-        jobs = self._remote_jobs_for_key(submission_key)
-        return SubmissionKeyStatus(
+        if observed_at.tzinfo is None or observed_at.utcoffset() is None:
+            raise BatchRecoveryError(
+                "recovery clock must return a timezone-aware datetime"
+            )
+        expected_key_tag = _submission_key_tag(submission_key)
+        expected_plan_tag = _plan_tag(plan.plan_hash)
+        recovered_by_partition: dict[str, RecoveredJobReceipt] = {}
+        recovered_job_ids: set[str] = set()
+        batch_ids: set[str] = set()
+
+        for job in self._remote_jobs_for_key(submission_key):
+            raw_tags = getattr(job, "tags", ()) or ()
+            if not isinstance(raw_tags, (list, tuple)) or any(
+                not isinstance(tag, str) for tag in raw_tags
+            ):
+                raise BatchRecoveryError("remote job tags must be a string sequence")
+            tags = tuple(raw_tags)
+            key_tags = [tag for tag in tags if tag.startswith(_IDEMPOTENCY_TAG_PREFIX)]
+            if key_tags != [expected_key_tag]:
+                raise BatchRecoveryError(
+                    "remote job must be bound only to the requested submission_key"
+                )
+            plan_tags = [tag for tag in tags if tag.startswith(_PLAN_TAG_PREFIX)]
+            if plan_tags != [expected_plan_tag]:
+                raise BatchRecoveryError(
+                    "remote job must be bound only to the canonical SubmissionPlan"
+                )
+            partition_tags = [
+                tag for tag in tags if tag.startswith(_PARTITION_TAG_PREFIX)
+            ]
+            if len(partition_tags) != 1:
+                raise BatchRecoveryError(
+                    "remote job must contain exactly one partition identity tag"
+                )
+            partition_id = partition_tags[0].removeprefix(_PARTITION_TAG_PREFIX)
+            partition = partitions.get(partition_id)
+            if partition is None:
+                raise BatchRecoveryError(
+                    "remote job partition is not present in the canonical SubmissionPlan"
+                )
+            if partition_id in recovered_by_partition:
+                raise BatchRecoveryError(
+                    "multiple remote jobs claim the same plan partition"
+                )
+
+            batch_id_value = getattr(job, "session_id", None)
+            batch_id = batch_id_value() if callable(batch_id_value) else batch_id_value
+            if not isinstance(batch_id, str) or not batch_id:
+                raise BatchRecoveryError("remote job has no trustworthy batch_id")
+            submitted_at = _submission_attempted_at_from_tags(tags)
+            provider_created_at = _provider_creation_date(job)
+            if submitted_at > observed_at or (
+                provider_created_at is not None and provider_created_at > observed_at
+            ):
+                raise BatchRecoveryError(
+                    "remote job submission evidence is later than recovery observation"
+                )
+            job_id = _job_id(job)
+            if job_id in recovered_job_ids:
+                raise BatchRecoveryError(
+                    "multiple recovered partitions claim the same provider job_id"
+                )
+            try:
+                status = _string_status(job.status()) or "UNKNOWN"
+            except Exception:
+                status = "UNAVAILABLE"
+            recovered_by_partition[partition_id] = RecoveredJobReceipt(
+                schema_version="1.0",
+                submission_key=submission_key,
+                plan_id=plan.plan_id,
+                plan_hash=plan.plan_hash,
+                primitive=plan.primitive,
+                batch_id=batch_id,
+                partition_id=partition_id,
+                job_id=job_id,
+                pub_ids=tuple(partition.pub_ids),
+                submitted_at=submitted_at,
+                submission_time_source="wrapper_pre_submit_job_tag",
+                provider_created_at=provider_created_at,
+                status=status,
+            )
+            recovered_job_ids.add(job_id)
+            batch_ids.add(batch_id)
+
+        if len(batch_ids) > 1:
+            raise BatchRecoveryError(
+                "one submission key resolved to jobs in multiple Runtime batches"
+            )
+        ordered_partition_ids = [
+            partition.partition_id for partition in plan.partitions
+        ]
+        recovered_partition_ids = [
+            partition_id
+            for partition_id in ordered_partition_ids
+            if partition_id in recovered_by_partition
+        ]
+        if (
+            recovered_partition_ids
+            != ordered_partition_ids[: len(recovered_partition_ids)]
+        ):
+            raise BatchRecoveryError(
+                "remote jobs do not preserve the canonical partition prefix"
+            )
+        missing_partition_ids = tuple(
+            ordered_partition_ids[len(recovered_partition_ids) :]
+        )
+        recovered_jobs = tuple(
+            recovered_by_partition[partition_id]
+            for partition_id in recovered_partition_ids
+        )
+        state: Literal["not_found", "partial", "complete"]
+        if not recovered_jobs:
+            state = "not_found"
+        elif missing_partition_ids:
+            state = "partial"
+        else:
+            state = "complete"
+        return SubmissionRecovery(
             schema_version="1.0",
             submission_key=submission_key,
-            jobs=tuple(
-                self._job_status(
-                    job,
-                    str(getattr(job, "session_id", None) or "unknown-batch"),
-                )
-                for job in jobs
-            ),
+            plan_id=plan.plan_id,
+            plan_hash=plan.plan_hash,
+            primitive=plan.primitive,
+            batch_id=next(iter(batch_ids), None),
+            state=state,
+            jobs=recovered_jobs,
+            missing_partition_ids=missing_partition_ids,
             observed_at=observed_at,
         )

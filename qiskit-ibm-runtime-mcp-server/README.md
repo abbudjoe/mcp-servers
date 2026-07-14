@@ -7,7 +7,7 @@
 An MCP server and typed Python wrapper for reproducible IBM Quantum Runtime
 workflows. The next release adds explicit resource ownership, immutable
 plans and approvals, exact circuit boundaries, complete Primitive V2 PUB/result
-contracts, Batch lifecycle receipts, and content-addressed artifacts.
+contracts, crash-safe Batch receipt recovery, and content-addressed artifacts.
 
 ## Safety contract
 
@@ -61,11 +61,17 @@ from qiskit_ibm_runtime_mcp_server.core import (
     BudgetPolicy,
     CircuitLimits,
     LocalArtifactCAS,
+    RecoveredJobReceipt,
+    SubmissionRecovery,
     SubmissionPlanner,
     ingest_circuit,
     parse_primitive_result,
 )
 ```
+
+Crash recovery requires the exact persisted `SubmissionPlan` and returns typed,
+plan-ordered job receipts. It fails closed instead of reconstructing identity or
+submission time from nullable provider metadata.
 
 See [API.md](docs/API.md) for the supported contracts and
 [runtime_contracts.py](examples/runtime_contracts.py) for an offline,

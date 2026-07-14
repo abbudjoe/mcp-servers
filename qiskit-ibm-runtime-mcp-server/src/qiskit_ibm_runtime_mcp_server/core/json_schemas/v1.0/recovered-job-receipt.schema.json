@@ -1,0 +1,105 @@
+{
+  "$id": "https://qiskit.org/schemas/runtime-contracts/v1.0/recovered-job-receipt.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Plan-bound identity and status recovered for one accepted Runtime job.",
+  "properties": {
+    "batch_id": {
+      "minLength": 1,
+      "title": "Batch Id",
+      "type": "string"
+    },
+    "job_id": {
+      "minLength": 1,
+      "title": "Job Id",
+      "type": "string"
+    },
+    "partition_id": {
+      "minLength": 1,
+      "title": "Partition Id",
+      "type": "string"
+    },
+    "plan_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Plan Hash",
+      "type": "string"
+    },
+    "plan_id": {
+      "minLength": 1,
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "primitive": {
+      "enum": [
+        "sampler",
+        "estimator"
+      ],
+      "title": "Primitive",
+      "type": "string"
+    },
+    "provider_created_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider Created At"
+    },
+    "pub_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Pub Ids",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "minLength": 1,
+      "title": "Status",
+      "type": "string"
+    },
+    "submission_key": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Submission Key",
+      "type": "string"
+    },
+    "submission_time_source": {
+      "const": "wrapper_pre_submit_job_tag",
+      "default": "wrapper_pre_submit_job_tag",
+      "title": "Submission Time Source",
+      "type": "string"
+    },
+    "submitted_at": {
+      "format": "date-time",
+      "title": "Submitted At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "submission_key",
+    "plan_id",
+    "plan_hash",
+    "primitive",
+    "batch_id",
+    "partition_id",
+    "job_id",
+    "pub_ids",
+    "submitted_at",
+    "status"
+  ],
+  "title": "RecoveredJobReceipt",
+  "type": "object",
+  "x-schema-version": "1.0"
+}
