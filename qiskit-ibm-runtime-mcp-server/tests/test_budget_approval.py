@@ -20,7 +20,7 @@ import multiprocessing
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from qiskit import QuantumCircuit, qpy
@@ -37,21 +37,26 @@ from qiskit_ibm_runtime_mcp_server.core.budgeting import (
     ESTIMATION_VERSION,
     ApprovalError,
     ApprovedBatchExecutor,
+    ApprovedSubmissionStep,
     BudgetContractError,
     BudgetLimitError,
+    IncompleteSubmissionError,
     ResolvedRuntimeTarget,
     ServiceRuntimeResourceResolver,
     SubmissionPlanner,
     SubmissionRequest,
     create_approval_receipt,
+    require_fully_submitted,
     submission_plan_payload,
     validate_approval,
 )
 from qiskit_ibm_runtime_mcp_server.core.circuits import ResolvedTarget, ingest_circuit
 from qiskit_ibm_runtime_mcp_server.core.models import (
     ApprovalReceipt,
+    ApprovedSubmission,
     BatchJobReceipt,
     BatchJobUsage,
+    BatchSubmissionFailure,
     BatchSubmissionReceipt,
     BatchUsage,
     BudgetPolicy,
@@ -667,6 +672,152 @@ def test_live_submit_reresolves_then_requires_bound_receipt(
         for partition in submitted_plan.partitions
     )
     assert submitted_limits.max_execution_seconds_per_job == 60
+
+
+def _failed_approved_submission(
+    *,
+    state: Literal["failed", "partial_failure"] = "failed",
+    with_job: bool = False,
+) -> ApprovedSubmission:
+    failure = BatchSubmissionFailure(
+        schema_version="1.0",
+        partition_id="partition-1",
+        error_type="IBMInputValueError",
+        message="provider rejected the Sampler job before creation",
+        failed_at=NOW,
+    )
+    receipt = BatchSubmissionReceipt(
+        schema_version="1.0",
+        submission_key="sampler-key",
+        batch_id="batch-1",
+        plan_hash=f"sha256:{'a' * 64}",
+        pub_ids=("sampler-scalar", "sampler-vector"),
+        jobs=(
+            (
+                BatchJobReceipt(
+                    schema_version="1.0",
+                    partition_id="partition-1",
+                    job_id="job-1",
+                    pub_ids=("sampler-scalar",),
+                    submitted_at=NOW,
+                ),
+            )
+            if with_job
+            else ()
+        ),
+        state=state,
+        reserved_at=NOW,
+        completed_at=NOW,
+        failure=failure,
+    )
+    return ApprovedSubmission(
+        schema_version="1.0",
+        plan_hash=receipt.plan_hash,
+        estimated_qpu_seconds=0.096,
+        approval_max_qpu_seconds=30,
+        receipt=receipt,
+    )
+
+
+def test_failed_submission_stops_before_the_next_primitive(
+    planner_bundle: tuple[SubmissionPlanner, RecordingResolver, SubmissionRequest],
+    policy: BudgetPolicy,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    planner, _, sampler_request = planner_bundle
+    executor = ApprovedBatchExecutor._from_test_components(  # type: ignore[arg-type]
+        planner,
+        RecordingLifecycle(),
+        approval_ledger=RecordingApprovalLedger(),
+        clock=lambda: NOW,
+    )
+    approval = _approval(executor.dry_run(sampler_request, policy))
+    estimator_request = replace(
+        sampler_request,
+        plan_id="estimator-plan",
+        submission_key="estimator-key",
+        primitive="estimator",
+    )
+    primitive_calls: list[str] = []
+    failed = _failed_approved_submission()
+
+    def submit_spy(
+        batch_id: str,
+        request: SubmissionRequest,
+        active_policy: BudgetPolicy,
+        active_approval: ApprovalReceipt | None,
+    ) -> ApprovedSubmission:
+        assert batch_id == "batch-1"
+        assert active_policy is policy
+        assert active_approval is approval
+        primitive_calls.append(request.primitive)
+        return failed
+
+    monkeypatch.setattr(executor, "submit", submit_spy)
+
+    with pytest.raises(
+        IncompleteSubmissionError, match="state=failed, jobs=0"
+    ) as caught:
+        executor.submit_in_order(
+            "batch-1",
+            (
+                ApprovedSubmissionStep(sampler_request, policy, approval),
+                ApprovedSubmissionStep(estimator_request, policy, approval),
+            ),
+        )
+
+    assert primitive_calls == ["sampler"]
+    assert caught.value.submission is failed
+    assert failed.receipt.state == "failed"
+    assert failed.receipt.failure is not None
+    assert failed.receipt.failure.error_type == "IBMInputValueError"
+
+
+def test_partial_failure_is_not_fully_submitted() -> None:
+    submission = _failed_approved_submission(state="partial_failure", with_job=True)
+
+    with pytest.raises(
+        IncompleteSubmissionError, match="state=partial_failure, jobs=1"
+    ):
+        require_fully_submitted(submission)
+
+
+def test_successful_submission_guard_preserves_object_identity() -> None:
+    receipt = BatchSubmissionReceipt(
+        schema_version="1.0",
+        submission_key="sampler-key",
+        batch_id="batch-1",
+        plan_hash=f"sha256:{'a' * 64}",
+        pub_ids=("sampler-scalar",),
+        jobs=(
+            BatchJobReceipt(
+                schema_version="1.0",
+                partition_id="partition-1",
+                job_id="job-1",
+                pub_ids=("sampler-scalar",),
+                submitted_at=NOW,
+            ),
+        ),
+        state="submitted",
+        reserved_at=NOW,
+        completed_at=NOW,
+    )
+    submission = ApprovedSubmission(
+        schema_version="1.0",
+        plan_hash=receipt.plan_hash,
+        estimated_qpu_seconds=0.096,
+        approval_max_qpu_seconds=30,
+        receipt=receipt,
+    )
+
+    assert require_fully_submitted(submission) is submission
+
+
+def test_submission_sequence_guard_is_publicly_exported() -> None:
+    from qiskit_ibm_runtime_mcp_server import core
+
+    assert core.require_fully_submitted is require_fully_submitted
+    assert core.ApprovedSubmissionStep is ApprovedSubmissionStep
 
 
 def test_approved_plan_cannot_be_replayed_under_a_different_submission_key(
