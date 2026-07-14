@@ -1,0 +1,107 @@
+{
+  "$id": "https://qiskit.org/schemas/runtime-contracts/v1.0/batch-status.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Typed status and TTL metadata recovered from a Runtime Batch.",
+  "properties": {
+    "accepting_jobs": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Accepting Jobs"
+    },
+    "batch_id": {
+      "minLength": 1,
+      "title": "Batch Id",
+      "type": "string"
+    },
+    "closed_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Closed At"
+    },
+    "interactive_timeout_seconds": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Interactive Timeout Seconds"
+    },
+    "maximum_time_seconds": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Maximum Time Seconds"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "title": "Observed At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "started_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Started At"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Status"
+    }
+  },
+  "required": [
+    "schema_version",
+    "batch_id",
+    "status",
+    "accepting_jobs",
+    "maximum_time_seconds",
+    "interactive_timeout_seconds",
+    "started_at",
+    "closed_at",
+    "observed_at"
+  ],
+  "title": "BatchStatus",
+  "type": "object",
+  "x-schema-version": "1.0"
+}

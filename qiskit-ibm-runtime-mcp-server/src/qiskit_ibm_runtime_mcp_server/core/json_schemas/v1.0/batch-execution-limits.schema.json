@@ -1,0 +1,55 @@
+{
+  "$id": "https://qiskit.org/schemas/runtime-contracts/v1.0/batch-execution-limits.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Explicit caller bounds beneath the locked Runtime service ceilings.",
+  "properties": {
+    "batch_max_time_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Batch Max Time Seconds",
+      "type": "integer"
+    },
+    "max_estimated_qpu_seconds_per_job": {
+      "exclusiveMinimum": 0,
+      "title": "Max Estimated Qpu Seconds Per Job",
+      "type": "number"
+    },
+    "max_execution_seconds_per_job": {
+      "exclusiveMinimum": 0,
+      "title": "Max Execution Seconds Per Job",
+      "type": "integer"
+    },
+    "max_jobs": {
+      "exclusiveMinimum": 0,
+      "title": "Max Jobs",
+      "type": "integer"
+    },
+    "max_pubs_per_job": {
+      "exclusiveMinimum": 0,
+      "title": "Max Pubs Per Job",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "ttl_margin_seconds": {
+      "default": 60,
+      "minimum": 0,
+      "title": "Ttl Margin Seconds",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "max_jobs",
+    "max_pubs_per_job",
+    "max_estimated_qpu_seconds_per_job",
+    "max_execution_seconds_per_job",
+    "batch_max_time_seconds"
+  ],
+  "title": "BatchExecutionLimits",
+  "type": "object",
+  "x-schema-version": "1.0"
+}
