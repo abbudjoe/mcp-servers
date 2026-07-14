@@ -23,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
 import pytest
+import qiskit
 from qiskit import QuantumCircuit, qpy
 from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 from qiskit_ibm_runtime.fake_provider import FakeAthensV2
@@ -376,7 +377,7 @@ def test_dry_run_resolves_locked_schedule_complete_options_and_shapes(
     assert plan.resolved_options["twirling"]["enable_gates"] is False
     assert plan.estimation_method == ESTIMATION_METHOD
     assert plan.estimation_version == ESTIMATION_VERSION
-    assert plan.estimation_software_versions["qiskit"] == "2.4.2"
+    assert plan.estimation_software_versions["qiskit"] == qiskit.__version__
     assert canonical_json_hash(submission_plan_payload(plan)) == plan.plan_hash
 
 
@@ -620,7 +621,10 @@ def _set(path: tuple[str | int, ...], value: Any) -> Mutation:
         ("execution_limit", _set(("maximum_execution_seconds",), 59)),
         ("estimation_method", _set(("estimation_method",), "other")),
         ("estimation_version", _set(("estimation_version",), "2.0")),
-        ("software_version", _set(("estimation_software_versions", "qiskit"), "2.5.0")),
+        (
+            "software_version",
+            _set(("estimation_software_versions", "qiskit"), "999.0.0"),
+        ),
     ],
 )
 def test_every_canonical_execution_field_mutation_invalidates_approval(
