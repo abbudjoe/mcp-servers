@@ -350,6 +350,45 @@
       "title": "CircuitRegister",
       "type": "object"
     },
+    "JsonValue": {},
+    "ParameterBindings": {
+      "additionalProperties": true,
+      "description": "Deterministic named parameter values with an explicit broadcast shape.",
+      "properties": {
+        "parameter_names": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Parameter Names",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "shape": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Shape",
+          "type": "array"
+        },
+        "values": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "schema_version",
+        "parameter_names",
+        "shape",
+        "values"
+      ],
+      "title": "ParameterBindings",
+      "type": "object"
+    },
     "PauliObservables": {
       "additionalProperties": true,
       "description": "A broadcast collection of separate Pauli observables.",
@@ -364,18 +403,22 @@
           "title": "Schema Version",
           "type": "string"
         },
-        "values": {
+        "shape": {
           "items": {
-            "type": "string"
+            "minimum": 0,
+            "type": "integer"
           },
-          "minItems": 1,
-          "title": "Values",
+          "title": "Shape",
           "type": "array"
+        },
+        "values": {
+          "$ref": "#/$defs/JsonValue"
         }
       },
       "required": [
         "schema_version",
         "kind",
+        "shape",
         "values"
       ],
       "title": "PauliObservables",
@@ -452,19 +495,12 @@
     "parameter_values": {
       "anyOf": [
         {
-          "items": {
-            "items": {
-              "type": "number"
-            },
-            "type": "array"
-          },
-          "type": "array"
+          "$ref": "#/$defs/ParameterBindings"
         },
         {
           "type": "null"
         }
-      ],
-      "title": "Parameter Values"
+      ]
     },
     "precision": {
       "anyOf": [

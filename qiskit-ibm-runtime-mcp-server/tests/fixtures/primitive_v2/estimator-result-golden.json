@@ -1,0 +1,45 @@
+{
+  "actual_qpu_seconds": 1.25,
+  "backend_name": "ibm_fixture",
+  "extensions": {},
+  "job_id": "job-estimator",
+  "job_metadata": {"fixture": "estimator", "primitive_version": 2},
+  "primitive": "estimator",
+  "pub_results": [
+    {
+      "data_bin_shape": [],
+      "ensemble_standard_error": {"dtype": "float64", "schema_version": "1.0", "shape": [], "value": {"kind": "inline_json", "schema_version": "1.0", "value": 0.02}},
+      "expectation_values": {"dtype": "float64", "schema_version": "1.0", "shape": [], "value": {"kind": "inline_json", "schema_version": "1.0", "value": 0.5}},
+      "extensions": {"future_scalar": {"kind": "inline_json", "schema_version": "1.0", "value": {"calibration": "v2"}}},
+      "metadata": {"case": "scalar-hamiltonian"},
+      "pub_id": "e-scalar",
+      "pub_index": 0,
+      "schema_version": "1.0",
+      "standard_deviations": null
+    },
+    {
+      "data_bin_shape": [2],
+      "ensemble_standard_error": null,
+      "expectation_values": {"dtype": "float64", "schema_version": "1.0", "shape": [2], "value": {"kind": "inline_json", "schema_version": "1.0", "value": [0.1, 0.2]}},
+      "extensions": {},
+      "metadata": {"case": "vector-observables"},
+      "pub_id": "e-vector",
+      "pub_index": 1,
+      "schema_version": "1.0",
+      "standard_deviations": {"dtype": "float64", "schema_version": "1.0", "shape": [2], "value": {"kind": "inline_json", "schema_version": "1.0", "value": [0.01, 0.02]}}
+    },
+    {
+      "data_bin_shape": [2, 2],
+      "ensemble_standard_error": null,
+      "expectation_values": {"dtype": "float64", "schema_version": "1.0", "shape": [2, 2], "value": {"kind": "inline_json", "schema_version": "1.0", "value": [[0.1, 0.2], [0.3, 0.4]]}},
+      "extensions": {"future_matrix": {"kind": "inline_json", "schema_version": "1.0", "value": [[1, 2], [3, 4]]}},
+      "metadata": {"case": "broadcast-matrix"},
+      "pub_id": "e-matrix",
+      "pub_index": 2,
+      "schema_version": "1.0",
+      "standard_deviations": {"dtype": "float64", "schema_version": "1.0", "shape": [2, 2], "value": {"kind": "inline_json", "schema_version": "1.0", "value": [[0.01, 0.02], [0.03, 0.04]]}}
+    }
+  ],
+  "schema_version": "1.0",
+  "usage": null
+}
