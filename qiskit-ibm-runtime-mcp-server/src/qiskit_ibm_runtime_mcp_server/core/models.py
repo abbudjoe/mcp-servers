@@ -858,11 +858,94 @@ class RecoveredSubmissionStatus(FrozenVersionedContractModel):
 
 
 class SubmissionKeyStatus(FrozenVersionedContractModel):
-    """Remote job evidence recoverable from a deterministic submission key."""
+    """Legacy provider inventory for a deterministic submission key.
+
+    This raw status shape is not sufficient to reconstruct a submission receipt.
+    Use :class:`SubmissionRecovery` for crash recovery.
+    """
 
     submission_key: str = Field(min_length=1, max_length=256)
     jobs: tuple[BatchJobStatus, ...]
     observed_at: AwareDatetime
+
+
+class RecoveredJobReceipt(FrozenVersionedContractModel):
+    """Plan-bound identity and status recovered for one accepted Runtime job."""
+
+    submission_key: str = Field(min_length=1, max_length=256)
+    plan_id: str = Field(min_length=1)
+    plan_hash: Sha256Id = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    primitive: Literal["sampler", "estimator"]
+    batch_id: str = Field(min_length=1)
+    partition_id: str = Field(min_length=1)
+    job_id: str = Field(min_length=1)
+    pub_ids: tuple[str, ...] = Field(min_length=1)
+    submitted_at: AwareDatetime
+    submission_time_source: Literal["wrapper_pre_submit_job_tag"] = (
+        "wrapper_pre_submit_job_tag"
+    )
+    provider_created_at: AwareDatetime | None = None
+    status: str = Field(min_length=1)
+
+
+class SubmissionRecovery(FrozenVersionedContractModel):
+    """Fail-closed crash recovery bound to one canonical submission plan."""
+
+    submission_key: str = Field(min_length=1, max_length=256)
+    plan_id: str = Field(min_length=1)
+    plan_hash: Sha256Id = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    primitive: Literal["sampler", "estimator"]
+    batch_id: str | None
+    state: Literal["not_found", "partial", "complete"]
+    jobs: tuple[RecoveredJobReceipt, ...]
+    missing_partition_ids: tuple[str, ...]
+    observed_at: AwareDatetime
+
+    @model_validator(mode="after")
+    def _state_matches_recovered_jobs(self) -> SubmissionRecovery:
+        partition_ids = [job.partition_id for job in self.jobs]
+        if len(partition_ids) != len(set(partition_ids)):
+            raise ValueError("recovered jobs require unique partition_id values")
+        if len(self.missing_partition_ids) != len(set(self.missing_partition_ids)):
+            raise ValueError("missing_partition_ids must be unique")
+        if set(partition_ids) & set(self.missing_partition_ids):
+            raise ValueError("recovered and missing partitions must be disjoint")
+        if any(not partition_id for partition_id in self.missing_partition_ids):
+            raise ValueError("missing_partition_ids cannot contain an empty value")
+        job_ids = [job.job_id for job in self.jobs]
+        if len(job_ids) != len(set(job_ids)):
+            raise ValueError("recovered jobs require unique job_id values")
+        if self.jobs:
+            if self.batch_id is None:
+                raise ValueError("recovered jobs require one batch_id")
+            if any(job.batch_id != self.batch_id for job in self.jobs):
+                raise ValueError("recovered jobs must belong to one batch_id")
+            if any(
+                job.submission_key != self.submission_key
+                or job.plan_id != self.plan_id
+                or job.plan_hash != self.plan_hash
+                or job.primitive != self.primitive
+                for job in self.jobs
+            ):
+                raise ValueError(
+                    "recovered jobs must match the top-level plan identity"
+                )
+        elif self.batch_id is not None:
+            raise ValueError("batch_id must be null when no jobs were recovered")
+        if self.state == "not_found":
+            if self.jobs or not self.missing_partition_ids:
+                raise ValueError("not_found recovery requires only missing partitions")
+        elif self.state == "partial":
+            if not self.jobs or not self.missing_partition_ids:
+                raise ValueError(
+                    "partial recovery requires jobs and missing partitions"
+                )
+        else:
+            if not self.jobs:
+                raise ValueError("complete recovery requires at least one job")
+            if self.missing_partition_ids:
+                raise ValueError("complete recovery cannot contain missing partitions")
+        return self
 
 
 class InlineJsonValue(VersionedContractModel):
@@ -1043,6 +1126,8 @@ PUBLIC_MODELS: tuple[type[BaseModel], ...] = (
     UsageReconciliation,
     RecoveredSubmissionStatus,
     SubmissionKeyStatus,
+    RecoveredJobReceipt,
+    SubmissionRecovery,
     SamplerRegisterResult,
     SamplerPubResult,
     InlineJsonValue,
