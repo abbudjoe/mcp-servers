@@ -83,7 +83,7 @@ SYSTEM_PROMPT = """You are a helpful quantum computing assistant with access to 
 through the Qiskit IBM Runtime MCP server.
 
 You can help users:
-- Set up their IBM Quantum account (setup_ibm_quantum_account_tool)
+- Use environment or existing saved credentials with an explicitly configured Runtime instance
 - List available quantum backends (list_backends_tool)
 - Find the least busy backend for running jobs (least_busy_backend_tool)
 - Get detailed backend properties (get_backend_properties_tool)

@@ -36,7 +36,8 @@ class TestMCPServerIntegration:
         assert isinstance(mcp.instructions, str)
         assert len(mcp.instructions) > 0
         # Verify instructions mention key workflow concepts
-        assert "setup_ibm_quantum_account_tool" in mcp.instructions
+        assert "QISKIT_IBM_RUNTIME_MCP_INSTANCE" in mcp.instructions
+        assert "never accepted by tools" in mcp.instructions
         assert "run_sampler_tool" in mcp.instructions
         assert "run_estimator_tool" in mcp.instructions
         assert "get_job_results_tool" in mcp.instructions
@@ -63,25 +64,17 @@ class TestToolIntegration:
     """Test MCP tool integration."""
 
     @pytest.mark.asyncio
-    async def test_setup_and_list_backends_workflow(
+    async def test_saved_credentials_and_list_backends_workflow(
         self, mock_env_vars, mock_runtime_service
     ):
-        """Test setup account -> list backends workflow."""
-        from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
-            list_backends,
-            setup_ibm_quantum_account,
-        )
+        """Test configured research authentication -> list backends workflow."""
+        from qiskit_ibm_runtime_mcp_server.ibm_runtime import list_backends
 
         with patch(
             "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
         ) as mock_init:
             mock_init.return_value = mock_runtime_service
 
-            # 1. Setup account
-            setup_result = await setup_ibm_quantum_account("test_token")
-            assert setup_result["status"] == "success"
-
-            # 2. List backends
             backends_result = await list_backends()
             assert backends_result["status"] == "success"
             assert len(backends_result["backends"]) > 0
@@ -828,32 +821,6 @@ class TestErrorHandlingIntegration:
     """Test error handling in integration scenarios."""
 
     @pytest.mark.asyncio
-    async def test_authentication_failure_recovery(self, mock_env_vars):
-        """Test recovery from authentication failures."""
-        from qiskit_ibm_runtime_mcp_server.ibm_runtime import setup_ibm_quantum_account
-
-        # First call fails with authentication error
-        with patch(
-            "qiskit_ibm_runtime_mcp_server.ibm_runtime.initialize_service"
-        ) as mock_init:
-            mock_init.side_effect = [
-                ValueError("Invalid token"),
-                Mock(),  # Second call succeeds
-            ]
-
-            # First attempt should fail
-            result1 = await setup_ibm_quantum_account("invalid_token")
-            assert result1["status"] == "error"
-
-            # Reset the mock for second attempt
-            mock_init.side_effect = None
-            mock_init.return_value = Mock()
-
-            # Second attempt should succeed
-            result2 = await setup_ibm_quantum_account("valid_token")
-            assert result2["status"] == "success"
-
-    @pytest.mark.asyncio
     async def test_service_unavailable_handling(self, mock_env_vars):
         """Test handling when quantum service is unavailable."""
         from qiskit_ibm_runtime_mcp_server.ibm_runtime import list_backends
@@ -900,7 +867,6 @@ class TestEndToEndScenarios:
             get_service_status,
             least_busy_backend,
             list_backends,
-            setup_ibm_quantum_account,
         )
 
         with (
@@ -922,23 +888,19 @@ class TestEndToEndScenarios:
             )
             mock_least_busy.return_value = mock_backend
 
-            # 1. Setup account
-            setup_result = await setup_ibm_quantum_account("test_token")
-            assert setup_result["status"] == "success"
-
-            # 2. Check service status
+            # 1. Check service status using configured credentials.
             status_result = await get_service_status()
             assert "connected" in status_result.lower()
 
-            # 3. List all backends
+            # 2. List all backends
             backends_result = await list_backends()
             assert backends_result["status"] == "success"
 
-            # 4. Find least busy backend
+            # 3. Find least busy backend
             least_busy_result = await least_busy_backend()
             assert least_busy_result["status"] == "success"
 
-            # 5. Get detailed properties of recommended backend
+            # 4. Get detailed properties of recommended backend
             properties_result = await get_backend_properties(
                 least_busy_result["backend_name"]
             )

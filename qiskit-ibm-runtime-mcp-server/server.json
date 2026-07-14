@@ -23,13 +23,14 @@
       "environmentVariables": [
         {
           "name": "QISKIT_IBM_TOKEN",
-          "description": "Your IBM Quantum API token for authentication",
-          "isRequired": true,
+          "description": "Optional IBM Quantum API token; existing saved credentials are used when omitted",
+          "isRequired": false,
           "isSecret": true
         },
         {
           "name": "QISKIT_IBM_RUNTIME_MCP_INSTANCE",
-          "description": "IBM Quantum instance CRN for faster startup (skips instance lookup)"
+          "description": "Required explicit IBM Quantum instance CRN for Runtime operations",
+          "isRequired": true
         }
       ]
     }

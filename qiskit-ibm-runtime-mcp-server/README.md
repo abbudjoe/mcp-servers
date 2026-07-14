@@ -46,55 +46,35 @@ This project recommends using [uv](https://astral.sh/uv) for virtual environment
    - Visit [IBM Quantum](https://quantum.cloud.ibm.com/)
    - Find your API key. From the [dashboard](https://quantum.cloud.ibm.com/), create your API key, then copy it to a secure location so you can use it for authentication. [More information](https://quantum.cloud.ibm.com/docs/en/guides/save-credentials)
 
-3. **Configure your credentials** (choose one method):
+3. **Configure authentication and an explicit Runtime instance**:
 
    **Option A: Environment Variable (Recommended)**
    ```bash
    # Copy the example environment file
    cp .env.example .env
 
-   # Edit .env and add your IBM Quantum API token
-   export QISKIT_IBM_TOKEN="your_token_here"
+   # Load the API token from your secret manager or shell environment
+   export QISKIT_IBM_TOKEN="<from-secret-manager>"
 
-   # Optional: Set instance for faster startup (skips instance lookup)
+   # Required: select the Runtime instance used by every live operation
    export QISKIT_IBM_RUNTIME_MCP_INSTANCE="your-instance-crn"
    ```
 
-   **Option B: Save Credentials Locally**
-   ```python
-   from qiskit_ibm_runtime import QiskitRuntimeService
+   **Option B: Existing Qiskit saved credentials**
 
-   # Save your credentials (one-time setup)
-   QiskitRuntimeService.save_account(
-       channel="ibm_quantum_platform",
-       token="your_token_here",
-       overwrite=True
-   )
-   ```
-   This stores your credentials in `~/.qiskit/qiskit-ibm.json`
-
-   **Option C: Pass Token Directly**
-   ```python
-   # Provide token when setting up the account
-   await setup_ibm_quantum_account(token="your_token_here")
-   ```
+   If credentials were already configured with Qiskit, the server can read
+   them from `~/.qiskit/qiskit-ibm.json`. It never creates, overwrites, migrates,
+   or deletes saved credentials.
 
    **Credential Resolution Priority:**
    The server looks for credentials in this order:
-   1. Explicit token passed to `setup_ibm_quantum_account()`
-   2. `QISKIT_IBM_TOKEN` environment variable
-   3. Saved credentials in `~/.qiskit/qiskit-ibm.json`
+   1. `QISKIT_IBM_TOKEN` environment variable
+   2. Existing saved credentials in `~/.qiskit/qiskit-ibm.json`
 
-   **Instance Configuration (Optional):**
-   To speed up service initialization, you can specify your IBM Quantum instance:
-   - Set `QISKIT_IBM_RUNTIME_MCP_INSTANCE` environment variable with your instance CRN
-   - This skips the automatic instance lookup which can be slow
+   **Instance Configuration (Required):**
+   - Set `QISKIT_IBM_RUNTIME_MCP_INSTANCE` to the instance CRN selected for research
+   - The server fails closed instead of searching across account instances
    - Find your instance CRN in [IBM Quantum Platform](https://quantum.cloud.ibm.com/instances)
-
-   **Instance Priority:**
-   - If you saved credentials with an instance (via `save_account(instance="...")`), the SDK uses it automatically
-   - `QISKIT_IBM_RUNTIME_MCP_INSTANCE` **overrides** any instance saved in credentials
-   - If neither is set, the SDK performs a slow lookup across all instances
 
    > **Note:** `QISKIT_IBM_RUNTIME_MCP_INSTANCE` is an MCP server-specific variable, not a standard Qiskit SDK environment variable.
 
@@ -113,25 +93,22 @@ The server will start and listen for MCP connections.
 #### Async Usage (MCP Server)
 
 ```python
-# 1. Setup IBM Quantum Account (optional if credentials already configured)
-# Will use saved credentials or environment variable if token not provided
-await setup_ibm_quantum_account()  # Uses saved credentials/env var
-# OR
-await setup_ibm_quantum_account(token="your_token_here")  # Explicit token
+# Credentials come only from the environment or existing Qiskit saved credentials.
+# QISKIT_IBM_RUNTIME_MCP_INSTANCE must be set before live Runtime calls.
 
-# 2. List Available Backends (no setup needed if credentials are saved)
+# 1. List Available Backends
 backends = await list_backends()
 print(f"Available backends: {len(backends['backends'])}")
 
-# 3. Get the least busy backend
+# 2. Get the least busy backend
 backend = await least_busy_backend()
 print(f"Least busy backend: {backend}")
 
-# 4. Get backend's properties
+# 3. Get backend's properties
 backend_props = await get_backend_properties("backend_name")
 print(f"Backend_name properties: {backend_props}")
 
-# 5. List recent jobs
+# 4. List recent jobs
 jobs = await list_my_jobs(10)
 print(f"Last 10 jobs: {jobs}")
 
@@ -143,7 +120,7 @@ print(f"Job status: {job_status}")
 results = await get_job_results("job_id")
 print(f"Counts: {results['counts']}")
 
-# 8. Cancel job
+# 5. Cancel job
 cancelled_job = await cancel_job("job_id")
 print(f"Cancelled job: {cancelled_job}")
 ```
@@ -154,7 +131,6 @@ For frameworks that don't support async operations, all async functions have a `
 
 ```python
 from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
-    setup_ibm_quantum_account,
     list_backends,
     least_busy_backend,
     get_backend_properties,
@@ -170,11 +146,7 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     cancel_job
 )
 
-# Optional: Setup account if not already configured
-# Will automatically use QISKIT_IBM_TOKEN env var or saved credentials
-setup_ibm_quantum_account.sync()  # No token needed if already configured
-
-# Use .sync for synchronous execution - no setup needed if credentials saved
+# Use .sync for synchronous execution after configuring authentication and instance.
 backends = list_backends.sync()
 print(f"Available backends: {backends['total_backends']}")
 
@@ -249,19 +221,6 @@ For more LLM providers (Anthropic, Google, Ollama, Watsonx) and detailed example
 ## API Reference
 
 ### Tools
-
-#### `setup_ibm_quantum_account(token: str = "", channel: str = "ibm_quantum_platform")`
-Configure IBM Quantum account with API token.
-
-**Parameters:**
-- `token` (optional): IBM Quantum API token. If not provided, the function will:
-  1. Check for `QISKIT_IBM_TOKEN` environment variable
-  2. Use saved credentials from `~/.qiskit/qiskit-ibm.json`
-- `channel`: Service channel (default: `"ibm_quantum_platform"`)
-
-**Returns:** Setup status and account information
-
-**Note:** If you already have saved credentials or have set the `QISKIT_IBM_TOKEN` environment variable, you can call this function without parameters or skip it entirely and use other functions directly.
 
 #### `list_backends()`
 Get list of available quantum backends.
@@ -485,22 +444,7 @@ List all IBM Quantum accounts saved on disk.
 **Returns:** Dictionary containing:
 - `status`: "success" or "error"
 - `accounts`: Dictionary of saved accounts (keyed by account name)
-- Each account contains: channel, url, token (masked for security)
-- `message`: Status message
-
-**Note:** Tokens are masked in the response, showing only the last 4 characters.
-
-#### `delete_saved_account(account_name: str)`
-Delete a saved IBM Quantum account from disk.
-
-**WARNING:** This permanently removes credentials from `~/.qiskit/qiskit-ibm.json`. The operation cannot be undone.
-
-**Parameters:**
-- `account_name`: Name of the saved account to delete. Use `list_saved_accounts()` to find available names.
-
-**Returns:** Dictionary containing:
-- `status`: "success" or "error"
-- `deleted`: Boolean indicating if deletion was successful
+- Secret-bearing fields are replaced with `[REDACTED]`
 - `message`: Status message
 
 #### `active_account_info()`
@@ -508,9 +452,7 @@ Get information about the currently active IBM Quantum account.
 
 **Returns:** Dictionary containing:
 - `status`: "success" or "error"
-- `account_info`: Account details including channel, url, token (masked for security)
-
-**Note:** Tokens are masked in the response, showing only the last 4 characters.
+- `account_info`: Account details with secret-bearing fields replaced by `[REDACTED]`
 
 #### `active_instance_info()`
 Get the Cloud Resource Name (CRN) of the currently active instance.
@@ -563,10 +505,9 @@ Simplest quantum circuit: single qubit Hadamard gate creating (|0> + |1>)/sqrt(2
 - **Store IBM Quantum tokens securely**: Never commit tokens to version control
 - **Use environment variables for production deployments**: Set `QISKIT_IBM_TOKEN` environment variable
 - **Credential Priority**: The server automatically resolves credentials in this order:
-  1. Explicit token parameter (highest priority)
-  2. `QISKIT_IBM_TOKEN` environment variable
-  3. Saved credentials in `~/.qiskit/qiskit-ibm.json` (lowest priority)
-- **Token Validation**: The server rejects placeholder values like `<PASSWORD>`, `<TOKEN>`, etc., to prevent accidental credential corruption
+  1. `QISKIT_IBM_TOKEN` environment variable
+  2. Existing saved credentials in `~/.qiskit/qiskit-ibm.json`
+- **No credential mutation**: The research server never saves, overwrites, migrates, or deletes credentials
 - **Implement rate limiting for production use**: Monitor API request frequency
 - **Monitor quantum resource consumption**: Track job submissions and backend usage
 
