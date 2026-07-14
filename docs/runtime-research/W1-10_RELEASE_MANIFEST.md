@@ -15,10 +15,11 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 - Distribution: `qiskit-ibm-runtime-mcp-server`
 - Version: `0.7.2`
 - Tag: `runtime-research-v0.7.2`
-- Tested/peeled commit: the exact object resolved by
-  `runtime-research-v0.7.2^{}`; the post-publication audit records its expanded
-  object ID in this manifest on the release branch
+- Annotated tag object: `0182e8b254b7e357b3738161d0cd9a6a720d3f01`
+- Tested/peeled commit: `de40ebfcc28946c6424e6d54a8399aac111b2daa`
 - Remote: `https://github.com/abbudjoe/mcp-servers.git`
+- GitHub Release:
+  `https://github.com/abbudjoe/mcp-servers/releases/tag/runtime-research-v0.7.2`
 
 ## Dependency pin
 
@@ -29,7 +30,8 @@ qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@
 An isolated CPython 3.12 installation from this exact requirement resolved to
 the tested commit and passed the installed-package probe for version `0.7.2`,
 37 generated/packaged schemas, `RecoveredJobReceipt`, and
-`SubmissionRecovery`.
+`SubmissionRecovery` (`REMOTE_PIN_INSTALL_OK 0.7.2 37
+de40ebfcc28946c6424e6d54a8399aac111b2daa`).
 
 ## Evidence hashes
 
