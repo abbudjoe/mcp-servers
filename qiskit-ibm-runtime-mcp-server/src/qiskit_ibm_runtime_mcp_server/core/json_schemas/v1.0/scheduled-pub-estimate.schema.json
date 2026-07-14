@@ -1,0 +1,67 @@
+{
+  "$id": "https://qiskit.org/schemas/runtime-contracts/v1.0/scheduled-pub-estimate.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "Auditable locked-method QPU estimate for one resolved PUB.",
+  "properties": {
+    "circuit_executions": {
+      "exclusiveMinimum": 0,
+      "title": "Circuit Executions",
+      "type": "integer"
+    },
+    "conservative_cycle_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Conservative Cycle Seconds",
+      "type": "number"
+    },
+    "estimated_qpu_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Estimated Qpu Seconds",
+      "type": "number"
+    },
+    "physical_circuit_executions": {
+      "exclusiveMinimum": 0,
+      "title": "Physical Circuit Executions",
+      "type": "integer"
+    },
+    "pub_id": {
+      "minLength": 1,
+      "title": "Pub Id",
+      "type": "string"
+    },
+    "repetitions_per_execution": {
+      "exclusiveMinimum": 0,
+      "title": "Repetitions Per Execution",
+      "type": "integer"
+    },
+    "scheduled_circuit_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Scheduled Circuit Seconds",
+      "type": "number"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "treatment_multiplier": {
+      "exclusiveMinimum": 0,
+      "title": "Treatment Multiplier",
+      "type": "number"
+    }
+  },
+  "required": [
+    "schema_version",
+    "pub_id",
+    "scheduled_circuit_seconds",
+    "conservative_cycle_seconds",
+    "circuit_executions",
+    "physical_circuit_executions",
+    "repetitions_per_execution",
+    "treatment_multiplier",
+    "estimated_qpu_seconds"
+  ],
+  "title": "ScheduledPubEstimate",
+  "type": "object",
+  "x-schema-version": "1.0"
+}

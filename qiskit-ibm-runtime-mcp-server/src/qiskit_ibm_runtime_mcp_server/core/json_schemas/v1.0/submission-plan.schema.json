@@ -493,6 +493,68 @@
       "title": "PauliObservables",
       "type": "object"
     },
+    "PubShape": {
+      "additionalProperties": true,
+      "description": "Resolved Primitive V2 broadcast and execution cardinality for one PUB.",
+      "properties": {
+        "circuit_executions": {
+          "exclusiveMinimum": 0,
+          "title": "Circuit Executions",
+          "type": "integer"
+        },
+        "observable_shape": {
+          "anyOf": [
+            {
+              "items": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Observable Shape"
+        },
+        "parameter_shape": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Parameter Shape",
+          "type": "array"
+        },
+        "pub_id": {
+          "minLength": 1,
+          "title": "Pub Id",
+          "type": "string"
+        },
+        "result_shape": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Result Shape",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "pub_id",
+        "parameter_shape",
+        "observable_shape",
+        "result_shape",
+        "circuit_executions"
+      ],
+      "title": "PubShape",
+      "type": "object"
+    },
     "SamplerPubSpec": {
       "additionalProperties": true,
       "description": "Validated SamplerV2 PUB input.",
@@ -534,6 +596,70 @@
         "shots"
       ],
       "title": "SamplerPubSpec",
+      "type": "object"
+    },
+    "ScheduledPubEstimate": {
+      "additionalProperties": true,
+      "description": "Auditable locked-method QPU estimate for one resolved PUB.",
+      "properties": {
+        "circuit_executions": {
+          "exclusiveMinimum": 0,
+          "title": "Circuit Executions",
+          "type": "integer"
+        },
+        "conservative_cycle_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Conservative Cycle Seconds",
+          "type": "number"
+        },
+        "estimated_qpu_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Estimated Qpu Seconds",
+          "type": "number"
+        },
+        "physical_circuit_executions": {
+          "exclusiveMinimum": 0,
+          "title": "Physical Circuit Executions",
+          "type": "integer"
+        },
+        "pub_id": {
+          "minLength": 1,
+          "title": "Pub Id",
+          "type": "string"
+        },
+        "repetitions_per_execution": {
+          "exclusiveMinimum": 0,
+          "title": "Repetitions Per Execution",
+          "type": "integer"
+        },
+        "scheduled_circuit_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Scheduled Circuit Seconds",
+          "type": "number"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "treatment_multiplier": {
+          "exclusiveMinimum": 0,
+          "title": "Treatment Multiplier",
+          "type": "number"
+        }
+      },
+      "required": [
+        "schema_version",
+        "pub_id",
+        "scheduled_circuit_seconds",
+        "conservative_cycle_seconds",
+        "circuit_executions",
+        "physical_circuit_executions",
+        "repetitions_per_execution",
+        "treatment_multiplier",
+        "estimated_qpu_seconds"
+      ],
+      "title": "ScheduledPubEstimate",
       "type": "object"
     },
     "SparsePauliHamiltonian": {
@@ -638,11 +764,16 @@
   "$id": "https://qiskit.org/schemas/runtime-contracts/v1.0/submission-plan.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": true,
-  "description": "Immutable-by-hash resolved dry-run submission plan.",
+  "description": "Complete immutable-by-hash dry-run plan for one bounded submission.",
   "properties": {
     "backend_name": {
       "minLength": 1,
       "title": "Backend Name",
+      "type": "string"
+    },
+    "compiler_target_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Compiler Target Hash",
       "type": "string"
     },
     "estimated_qpu_seconds": {
@@ -650,9 +781,34 @@
       "title": "Estimated Qpu Seconds",
       "type": "number"
     },
+    "estimation_method": {
+      "minLength": 1,
+      "title": "Estimation Method",
+      "type": "string"
+    },
+    "estimation_software_versions": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Estimation Software Versions",
+      "type": "object"
+    },
+    "estimation_version": {
+      "minLength": 1,
+      "title": "Estimation Version",
+      "type": "string"
+    },
     "instance_id": {
       "minLength": 1,
       "title": "Instance Id",
+      "type": "string"
+    },
+    "instance_plan_type": {
+      "enum": [
+        "open",
+        "paid"
+      ],
+      "title": "Instance Plan Type",
       "type": "string"
     },
     "maximum_execution_seconds": {
@@ -678,6 +834,11 @@
       "title": "Plan Id",
       "type": "string"
     },
+    "policy_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Policy Hash",
+      "type": "string"
+    },
     "primitive": {
       "enum": [
         "sampler",
@@ -685,6 +846,14 @@
       ],
       "title": "Primitive",
       "type": "string"
+    },
+    "pub_shapes": {
+      "items": {
+        "$ref": "#/$defs/PubShape"
+      },
+      "minItems": 1,
+      "title": "Pub Shapes",
+      "type": "array"
     },
     "pubs": {
       "items": {
@@ -706,24 +875,67 @@
       "title": "Resolved Options",
       "type": "object"
     },
+    "scheduled_estimates": {
+      "items": {
+        "$ref": "#/$defs/ScheduledPubEstimate"
+      },
+      "minItems": 1,
+      "title": "Scheduled Estimates",
+      "type": "array"
+    },
     "schema_version": {
       "const": "1.0",
       "title": "Schema Version",
       "type": "string"
+    },
+    "submission_key": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Submission Key",
+      "type": "string"
+    },
+    "target_hash": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Target Hash",
+      "type": "string"
+    },
+    "total_circuit_executions": {
+      "exclusiveMinimum": 0,
+      "title": "Total Circuit Executions",
+      "type": "integer"
+    },
+    "treatments": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Treatments",
+      "type": "array"
     }
   },
   "required": [
     "schema_version",
     "plan_id",
+    "submission_key",
     "plan_hash",
+    "policy_hash",
     "instance_id",
+    "instance_plan_type",
     "backend_name",
+    "target_hash",
+    "compiler_target_hash",
     "primitive",
     "pubs",
+    "pub_shapes",
     "resolved_options",
+    "treatments",
     "partitions",
+    "scheduled_estimates",
+    "total_circuit_executions",
     "estimated_qpu_seconds",
-    "maximum_execution_seconds"
+    "maximum_execution_seconds",
+    "estimation_method",
+    "estimation_version",
+    "estimation_software_versions"
   ],
   "title": "SubmissionPlan",
   "type": "object",
