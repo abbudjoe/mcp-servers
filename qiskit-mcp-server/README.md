@@ -13,7 +13,7 @@ A Model Context Protocol (MCP) server that provides quantum circuit transpilatio
 - **Topology Support**: Built-in support for linear, ring, grid, and custom coupling maps
 - **Circuit Analysis**: Analyze circuit complexity without transpilation
 - **Optimization Comparison**: Compare results across all optimization levels
-- **Dual API**: Supports both async (MCP) and sync (Jupyter, scripts) usage
+- **Dual API**: Supports async usage and a `.sync` interface for synchronous callers
 
 ## Prerequisites
 
@@ -128,7 +128,9 @@ transpiled_qpy = result["transpiled_circuit"]["circuit_qpy"]
 result2 = await transpile_circuit(transpiled_qpy, circuit_format="qpy", optimization_level=3)
 ```
 
-### Sync Usage (Scripts, Jupyter)
+### Sync Usage (Scripts and synchronous frameworks)
+
+Use `await` in Jupyter or any other environment with an active event loop.
 
 ```python
 from qiskit_mcp_server.transpiler import transpile_circuit, analyze_circuit

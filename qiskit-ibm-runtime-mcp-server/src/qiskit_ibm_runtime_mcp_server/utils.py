@@ -24,11 +24,12 @@ via the `.sync` attribute:
     # Async usage (in async context)
     result = await list_backends()
 
-    # Sync usage (in sync context, Jupyter notebooks, DSPy, etc.)
+    # Sync usage (in a synchronous context such as a script or DSPy)
     result = list_backends.sync()
 
-The sync wrapper handles event loop management automatically, including
-nested event loops in Jupyter notebooks (via nest_asyncio).
+In an asynchronous context, including modern Jupyter notebooks, call the
+function with ``await``. The synchronous wrapper intentionally does not mutate
+or nest the caller's event loop.
 """
 
 import asyncio
@@ -37,34 +38,26 @@ from functools import wraps
 from typing import Any, TypeVar
 
 
-# Apply nest_asyncio to allow running async code in environments with existing event loops
-try:
-    import nest_asyncio
-
-    nest_asyncio.apply()
-except ImportError:
-    pass
-
-
 F = TypeVar("F", bound=Callable[..., Any])
 T = TypeVar("T")
 
 
-def _run_async(coro: Coroutine[Any, Any, T]) -> T:
+def _run_async(coro_factory: Callable[[], Coroutine[Any, Any, T]]) -> T:
     """Helper to run async functions synchronously.
 
-    This handles both cases:
-    - Running in a Jupyter notebook or other environment with an existing event loop
-    - Running in a standard Python script without an event loop
+    The synchronous boundary owns its event loop. Calling it from an active
+    event loop would require mutating or nesting that loop, which violates
+    AnyIO's task ownership contract. Async callers must use ``await`` instead.
     """
     try:
-        loop = asyncio.get_event_loop()
-        # In a running loop (e.g., Jupyter), this works because
-        # nest_asyncio allows nested run_until_complete calls
-        return loop.run_until_complete(coro)
+        asyncio.get_running_loop()
     except RuntimeError:
-        # No event loop exists, create one
-        return asyncio.run(coro)
+        return asyncio.run(coro_factory())
+
+    raise RuntimeError(
+        "The .sync interface cannot run inside an active event loop; "
+        "await the asynchronous function instead."
+    )
 
 
 def with_sync(func: F) -> F:
@@ -84,7 +77,7 @@ def with_sync(func: F) -> F:
 
     @wraps(func)
     def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-        return _run_async(func(*args, **kwargs))
+        return _run_async(lambda: func(*args, **kwargs))
 
     func.sync = sync_wrapper  # type: ignore[attr-defined]
     return func
