@@ -21,6 +21,7 @@ from .approvals import (
 )
 from .batches import (
     BatchContractError,
+    BatchRecoveryError,
     BatchLifecycle,
     BatchLimitError,
     DuplicatePolicy,
@@ -106,6 +107,7 @@ from .models import (
     PubShape,
     QubitSnapshot,
     RuntimeUsage,
+    RecoveredJobReceipt,
     RecoveredSubmissionStatus,
     SamplerPubResult,
     SamplerPubSpec,
@@ -115,6 +117,7 @@ from .models import (
     SubmissionPartition,
     SubmissionPlan,
     SubmissionKeyStatus,
+    SubmissionRecovery,
     TargetMetadata,
     UsageReconciliation,
 )
@@ -157,6 +160,7 @@ __all__ = [
     "BatchLifecycle",
     "BatchLimitError",
     "BatchReference",
+    "BatchRecoveryError",
     "BackendSnapshot",
     "BackendStatusSnapshot",
     "BatchStatus",
@@ -200,6 +204,7 @@ __all__ = [
     "ResolvedTarget",
     "ResolvedRuntimeTarget",
     "RecoveredSubmissionStatus",
+    "RecoveredJobReceipt",
     "RuntimeUsage",
     "RuntimeAuthorityService",
     "ServiceRuntimeResourceResolver",
@@ -213,6 +218,7 @@ __all__ = [
     "SubmissionPlanner",
     "SubmissionRequest",
     "SubmissionKeyStatus",
+    "SubmissionRecovery",
     "SubmissionReceiptRegistry",
     "SubmittedPrimitiveJob",
     "TargetMetadata",

@@ -20,7 +20,7 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 - Target contract: an immutable, clean-installable Runtime wrapper release with
   versioned schemas, an exact Workstream 2 dependency pin, and a generic,
   dependency-ordered upstream contribution series
-- Status: `met`
+- Status: `in-progress`
 - Live-compute policy: no QPU submission or paid-compute mutation is authorized
   or required for this workstream
 
@@ -61,3 +61,33 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
   non-blocking because the tag object, peeled remote ref, resolver, and manifest
   all identify the exact tested commit.
 - No QPU or paid-compute mutation was performed during W1-10.
+
+## Recovery-contract amendment
+
+- Finding: release `0.7.1` recovery by submission key exposes provider job
+  statuses with raw tags and nullable `created_at`, but does not return typed
+  plan, partition, and PUB identity with a trustworthy submission timestamp.
+- Root cause: restart recovery treated provider inventory as a receipt boundary
+  instead of requiring and validating the caller-owned immutable
+  `SubmissionPlan` against provider tags.
+- Target contract: recovery requires the exact persisted plan, validates its
+  canonical hash and every provider identity tag, returns ordered typed
+  `RecoveredJobReceipt` values with required wrapper-owned UTC pre-submit
+  timestamps, and fails closed on missing, ambiguous, duplicate, non-prefix, or
+  contradictory evidence. Nullable provider creation time is corroboration only;
+  the trust boundary explicitly includes provider-account tag writers.
+- Mapped DoD: W1-07 typed recovery and immutable receipts; W1-10 smoke-finding
+  resolution, release gates, immutable tested tag, accessible W2 pin, and
+  independent spec-conformance review.
+- Implementation evidence: 77 focused lifecycle/schema tests passed; the full
+  Runtime suite passed on Python 3.10–3.14 with 405 passed and one gated skip
+  per interpreter; all 37 schemas matched generated output; safety branch
+  coverage remained 100%/91.07%/90.91%/100%; exact CI lint/format/mypy/Bandit,
+  canonical compatibility, and the other four package suites passed.
+- Package evidence: reproducible 0.7.2 wheel and sdist builds passed isolated
+  Python 3.12 installs. Lock/wheel/sdist SHA-256 values are recorded in
+  `W1-10_RELEASE_MANIFEST.md`.
+- Independent rereview: clean after duplicate job identity, timestamp provenance,
+  complete-state validation, and the provider eight-tag ceiling were fixed.
+- Status: `release-candidate`; release `0.7.1` remains immutable but is not the
+  W2 recovery-safe pin. No QPU or cloud mutation was performed for this repair.

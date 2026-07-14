@@ -8,21 +8,21 @@ obtain a copy of this license in the LICENSE file in the root directory
 of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 -->
 
-# Experiment Compatibility — Runtime Research 0.7.1
+# Experiment Compatibility — Runtime Research 0.7.2
 
 This document is the Workstream 2 handoff contract for the immutable
-`runtime-research-v0.7.1` release.
+`runtime-research-v0.7.2` release.
 
 ## Exact dependency pin
 
 Use this PEP 508 requirement; do not depend on a branch:
 
 ```text
-qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.1#subdirectory=qiskit-ibm-runtime-mcp-server
+qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.2#subdirectory=qiskit-ibm-runtime-mcp-server
 ```
 
 Expected installed distribution/version:
-`qiskit-ibm-runtime-mcp-server==0.7.1`.
+`qiskit-ibm-runtime-mcp-server==0.7.2`.
 
 ## Runtime environment
 
@@ -51,6 +51,8 @@ compatibility shims, not the experiment execution contract.
 - Budget policy schema: `BudgetPolicy` version `1.0`.
 - Approval schema: `ApprovalReceipt` version `1.0`.
 - Batch and usage schemas: version `1.0`.
+- Crash recovery schemas: `RecoveredJobReceipt` and `SubmissionRecovery`
+  version `1.0`.
 - Estimation method/version: `qiskit-schedule-estimate` / `1.0`.
 
 Validate persisted documents against the packaged draft 2020-12 schemas. Keep
@@ -68,6 +70,16 @@ package version and schema version as separate provenance fields.
 
 Direct Sampler/Estimator MCP tools are non-submitting compatibility stubs and
 must not be used by Workstream 2.
+
+Persist every canonical `SubmissionPlan` before calling the approved execution
+boundary. After a crash, call
+`recover_jobs_by_submission_key(plan.submission_key, plan)`. Accept only its
+typed plan-ordered identities and required wrapper-tagged `submitted_at`; never
+reconstruct a receipt from `SubmissionKeyStatus.tags` or nullable provider
+`creation_date`. The required time is the wrapper's UTC pre-submit lower bound;
+optional `provider_created_at` is corroboration. Runtime tags are mutable by
+provider-account writers, so constrain write access and persist recovered
+receipts immediately.
 
 ## Known limitations
 

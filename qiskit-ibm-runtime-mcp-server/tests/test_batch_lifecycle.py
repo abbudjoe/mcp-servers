@@ -29,6 +29,7 @@ from qiskit_ibm_runtime_mcp_server.core import (
     BatchExecutionLimits,
     BatchLifecycle,
     BatchLimitError,
+    BatchRecoveryError,
     DuplicateSubmissionError,
     EstimatorPubSpec,
     LocalArtifactCAS,
@@ -41,6 +42,7 @@ from qiskit_ibm_runtime_mcp_server.core import (
     SubmissionReceiptRegistry,
     ingest_circuit,
     plan_batch_partitions,
+    submission_plan_hash,
 )
 
 
@@ -334,7 +336,11 @@ class RecordingPrimitiveFactory:
                 call_number = len(owner.run_calls)
                 if owner.fail_call == call_number:
                     raise RuntimeError("synthetic second-partition failure")
-                job = FakeJob(f"job-{call_number}")
+                job = FakeJob(
+                    f"job-{call_number}",
+                    tags=options["environment"]["job_tags"],
+                    session_id=batch.session_id,
+                )
                 owner.jobs.append(job)
                 return job
 
@@ -548,6 +554,7 @@ def test_reattached_lower_effective_ttl_rebounds_submission(tmp_path: Path) -> N
     lifecycle, _, _, primitive_factory, sink, _ = _lifecycle(tmp_path, batch=batch)
     limits = _limits()
     plan = _plan(sink, limits)
+    plan.submission_key = "lower-effective-ttl"
     reference = lifecycle.open_batch("batch-1", expected_backend_name="ibm_test")
 
     receipt = lifecycle._submit_resolved_plan(
@@ -561,6 +568,7 @@ def test_reattached_lower_effective_ttl_rebounds_submission(tmp_path: Path) -> N
     assert receipt.state == "submitted"
     assert len(primitive_factory.run_calls) == 2
     oversized = _plan(sink, limits, (("pub-x", 3), ("pub-y", 3)))
+    oversized.submission_key = "too-large-for-effective-ttl"
     with pytest.raises(BatchLimitError, match="effective Batch TTL"):
         lifecycle._submit_resolved_plan(
             reference.batch_id,
@@ -576,6 +584,7 @@ def test_submission_returns_immutable_complete_receipt_and_enforced_tags(
     lifecycle, _, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
     limits = _limits()
     plan = _plan(sink, limits)
+    plan.submission_key = "submission-001"
     lifecycle.create_batch("ibm_test", limits)
 
     receipt = lifecycle._submit_resolved_plan(
@@ -621,6 +630,13 @@ def test_submission_returns_immutable_complete_receipt_and_enforced_tags(
         "caller-tag" in options["environment"]["job_tags"]
         for options in primitive_factory.options
     )
+    assert all(
+        any(
+            tag == "qiskit-mcp-attempted-at:20260713T120000.000000Z"
+            for tag in options["environment"]["job_tags"]
+        )
+        for options in primitive_factory.options
+    )
     with pytest.raises(ValidationError, match="frozen"):
         receipt.state = "failed"  # type: ignore[misc]
     with pytest.raises(ValidationError, match="frozen"):
@@ -633,6 +649,7 @@ def test_submission_rejects_oversized_caller_job_tag_before_primitive_run(
     lifecycle, _, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
     limits = _limits()
     plan = _plan(sink, limits)
+    plan.submission_key = "oversized-caller-tag"
     plan.resolved_options["environment"] = {"job_tags": ["x" * 87]}
     lifecycle.create_batch("ibm_test", limits)
 
@@ -651,16 +668,93 @@ def test_submission_rejects_oversized_caller_job_tag_before_primitive_run(
     assert primitive_factory.run_calls == []
 
 
+def test_submission_rejects_caller_spoofing_reserved_recovery_tags(
+    tmp_path: Path,
+) -> None:
+    lifecycle, _, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
+    limits = _limits()
+    plan = _plan(sink, limits)
+    plan.submission_key = "reserved-tag-spoof"
+    plan.resolved_options["environment"] = {
+        "job_tags": ["qiskit-mcp-attempted-at:spoofed"]
+    }
+    lifecycle.create_batch("ibm_test", limits)
+
+    receipt = lifecycle._submit_resolved_plan(
+        "batch-1",
+        plan,
+        submission_key="reserved-tag-spoof",
+        limits=limits,
+    )
+
+    assert receipt.state == "failed"
+    assert receipt.failure is not None
+    assert "reserved qiskit-mcp- namespace" in receipt.failure.message
+    assert primitive_factory.run_calls == []
+
+
+def test_submission_key_must_match_the_plan_before_remote_lookup(
+    tmp_path: Path,
+) -> None:
+    lifecycle, service, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
+    plan = _plan(sink, _limits())
+
+    with pytest.raises(BatchContractError, match="exactly match"):
+        lifecycle._submit_resolved_plan(
+            "batch-1",
+            plan,
+            submission_key="not-the-plan-key",
+            limits=_limits(),
+        )
+
+    assert service.jobs_calls == []
+    assert primitive_factory.run_calls == []
+
+
+def test_submission_enforces_the_provider_eight_tag_limit(tmp_path: Path) -> None:
+    lifecycle, _, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
+    limits = _limits()
+    lifecycle.create_batch("ibm_test", limits)
+    allowed = _plan(sink, limits, (("pub-a", 1),))
+    allowed.submission_key = "four-caller-tags"
+    allowed.resolved_options["environment"] = {
+        "job_tags": [f"caller-{index}" for index in range(4)]
+    }
+
+    accepted = lifecycle._submit_resolved_plan(
+        "batch-1", allowed, submission_key=allowed.submission_key, limits=limits
+    )
+
+    assert accepted.state == "submitted"
+    assert len(primitive_factory.options[0]["environment"]["job_tags"]) == 8
+
+    rejected = _plan(sink, limits, (("pub-b", 1),))
+    rejected.submission_key = "five-caller-tags"
+    rejected.resolved_options["environment"] = {
+        "job_tags": [f"caller-{index}" for index in range(5)]
+    }
+    failed = lifecycle._submit_resolved_plan(
+        "batch-1", rejected, submission_key=rejected.submission_key, limits=limits
+    )
+
+    assert failed.state == "failed"
+    assert failed.failure is not None
+    assert "no more than 8 items" in failed.failure.message
+    assert len(primitive_factory.run_calls) == 1
+
+
 def test_estimator_partitions_use_the_same_batch_receipt_contract(
     tmp_path: Path,
 ) -> None:
     lifecycle, _, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
     limits = _limits()
     lifecycle.create_batch("ibm_test", limits)
+    plan = _estimator_plan(sink, limits)
+    plan.submission_key = "estimator-key"
 
     receipt = lifecycle._submit_resolved_plan(
         "batch-1",
-        _estimator_plan(sink, limits),
+        plan,
         submission_key="estimator-key",
         limits=limits,
     )
@@ -677,6 +771,7 @@ def test_duplicate_submission_key_is_refused_before_a_second_primitive_call(
     lifecycle, _, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
     limits = _limits()
     plan = _plan(sink, limits)
+    plan.submission_key = "duplicate-key"
     lifecycle.create_batch("ibm_test", limits)
     first = lifecycle._submit_resolved_plan(
         "batch-1", plan, submission_key="duplicate-key", limits=limits
@@ -719,6 +814,7 @@ def test_remote_live_duplicate_is_refused_after_local_registry_loss(
     lifecycle, _, _, primitive_factory, sink, _ = _lifecycle(tmp_path, service=service)
     limits = _limits()
     plan = _plan(sink, limits)
+    plan.submission_key = "restart-key"
     lifecycle.create_batch("ibm_test", limits)
 
     with pytest.raises(DuplicateSubmissionError, match="remote jobs"):
@@ -735,6 +831,7 @@ def test_explicit_allow_live_policy_is_the_only_live_duplicate_override(
     lifecycle, _, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
     limits = _limits()
     plan = _plan(sink, limits, (("pub-a", 1),))
+    plan.submission_key = "override-key"
     lifecycle.create_batch("ibm_test", limits)
     lifecycle._submit_resolved_plan(
         "batch-1", plan, submission_key="override-key", limits=limits
@@ -758,6 +855,7 @@ def test_allow_if_terminal_accepts_real_locked_job_status_enums(
     lifecycle, service, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
     limits = _limits()
     plan = _plan(sink, limits, (("pub-a", 1),))
+    plan.submission_key = "terminal-key"
     lifecycle.create_batch("ibm_test", limits)
     first = lifecycle._submit_resolved_plan(
         "batch-1", plan, submission_key="terminal-key", limits=limits
@@ -790,6 +888,7 @@ def test_remote_terminal_enum_allows_explicit_terminal_override(
     lifecycle, _, _, primitive_factory, sink, _ = _lifecycle(tmp_path, service=service)
     limits = _limits()
     plan = _plan(sink, limits, (("pub-a", 1),))
+    plan.submission_key = f"terminal-{status.name.lower()}"
     lifecycle.create_batch("ibm_test", limits)
 
     receipt = lifecycle._submit_resolved_plan(
@@ -828,6 +927,7 @@ def test_partial_failure_receipt_and_status_recovery_preserve_accepted_jobs(
     )
     limits = _limits()
     plan = _plan(sink, limits)
+    plan.submission_key = "partial-key"
     lifecycle.create_batch("ibm_test", limits)
 
     receipt = lifecycle._submit_resolved_plan(
@@ -849,27 +949,213 @@ def test_partial_failure_receipt_and_status_recovery_preserve_accepted_jobs(
     assert recovered.batch.batch_id == batch.session_id
 
 
-def test_tagged_status_recovery_works_without_process_local_receipt(
+def test_crash_recovery_returns_plan_bound_receipts_without_local_state(
     tmp_path: Path,
 ) -> None:
-    service = FakeService()
-    service.tagged_jobs = [
-        FakeJob("job-recovered", status="QUEUED", session_id="batch-recovered")
-    ]
-    lifecycle, _, _, _, _, _ = _lifecycle(tmp_path, service=service)
+    lifecycle, service, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
+    limits = _limits()
+    plan = _plan(sink, limits)
+    plan.submission_key = "lost-receipt-key"
+    plan.plan_hash = submission_plan_hash(plan)
+    lifecycle.create_batch("ibm_test", limits)
+    receipt = lifecycle._submit_resolved_plan(
+        "batch-1", plan, submission_key=plan.submission_key, limits=limits
+    )
+    primitive_factory.jobs[1].creation_date = None
+    service.tagged_jobs = list(reversed(primitive_factory.jobs))
+    restarted, _, _, _, _, _ = _lifecycle(tmp_path, service=service)
 
-    recovered = lifecycle.recover_jobs_by_submission_key("lost-receipt-key")
+    recovered = restarted.recover_jobs_by_submission_key("lost-receipt-key", plan)
 
     assert recovered.submission_key == "lost-receipt-key"
-    assert [(job.batch_id, job.job_id, job.status) for job in recovered.jobs] == [
-        ("batch-recovered", "job-recovered", "QUEUED")
+    assert recovered.plan_id == plan.plan_id
+    assert recovered.plan_hash == plan.plan_hash
+    assert recovered.primitive == "sampler"
+    assert recovered.batch_id == "batch-1"
+    assert recovered.state == "complete"
+    assert recovered.missing_partition_ids == ()
+    assert [
+        (job.partition_id, job.job_id, job.pub_ids, job.submitted_at)
+        for job in recovered.jobs
+    ] == [
+        (
+            plan.partitions[0].partition_id,
+            "job-1",
+            tuple(plan.partitions[0].pub_ids),
+            receipt.jobs[0].submitted_at,
+        ),
+        (
+            plan.partitions[1].partition_id,
+            "job-2",
+            tuple(plan.partitions[1].pub_ids),
+            receipt.jobs[1].submitted_at,
+        ),
     ]
+    assert all(
+        job.submission_time_source == "wrapper_pre_submit_job_tag"
+        for job in recovered.jobs
+    )
+    assert [job.provider_created_at for job in recovered.jobs] == [NOW, None]
+    assert all(job.status == "RUNNING" for job in recovered.jobs)
+
+
+def test_crash_recovery_reports_a_typed_partition_prefix(tmp_path: Path) -> None:
+    lifecycle, service, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
+    limits = _limits()
+    plan = _plan(sink, limits)
+    plan.submission_key = "partial-recovery-key"
+    plan.plan_hash = submission_plan_hash(plan)
+    lifecycle.create_batch("ibm_test", limits)
+    lifecycle._submit_resolved_plan(
+        "batch-1", plan, submission_key=plan.submission_key, limits=limits
+    )
+    service.tagged_jobs = primitive_factory.jobs[:1]
+
+    recovered = lifecycle.recover_jobs_by_submission_key(plan.submission_key, plan)
+
+    assert recovered.state == "partial"
+    assert [job.partition_id for job in recovered.jobs] == [
+        plan.partitions[0].partition_id
+    ]
+    assert recovered.missing_partition_ids == (plan.partitions[1].partition_id,)
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (
+            lambda tags, plan: [
+                tag for tag in tags if not tag.startswith("qiskit-mcp-attempted-at:")
+            ],
+            "submission-attempt tag",
+        ),
+        (
+            lambda tags, plan: [
+                "qiskit-mcp-attempted-at:not-a-timestamp"
+                if tag.startswith("qiskit-mcp-attempted-at:")
+                else tag
+                for tag in tags
+            ],
+            "invalid wrapper submission-attempt tag",
+        ),
+        (
+            lambda tags, plan: [
+                f"qiskit-mcp-plan:{'8' * 64}"
+                if tag.startswith("qiskit-mcp-plan:")
+                else tag
+                for tag in tags
+            ],
+            "canonical SubmissionPlan",
+        ),
+        (
+            lambda tags, plan: [*tags, f"qiskit-mcp-plan:{'8' * 64}"],
+            "bound only to the canonical SubmissionPlan",
+        ),
+        (
+            lambda tags, plan: [
+                "qiskit-mcp-partition:not-in-plan"
+                if tag.startswith("qiskit-mcp-partition:")
+                else tag
+                for tag in tags
+            ],
+            "not present",
+        ),
+    ],
+)
+def test_crash_recovery_fails_closed_on_untrusted_remote_identity(
+    tmp_path: Path,
+    mutate: Any,
+    message: str,
+) -> None:
+    lifecycle, service, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
+    limits = _limits()
+    plan = _plan(sink, limits, (("pub-a", 1),))
+    plan.submission_key = "untrusted-recovery-key"
+    plan.plan_hash = submission_plan_hash(plan)
+    lifecycle.create_batch("ibm_test", limits)
+    lifecycle._submit_resolved_plan(
+        "batch-1", plan, submission_key=plan.submission_key, limits=limits
+    )
+    job = primitive_factory.jobs[0]
+    job.tags = mutate(job.tags, plan)
+    service.tagged_jobs = [job]
+
+    with pytest.raises(BatchRecoveryError, match=message):
+        lifecycle.recover_jobs_by_submission_key(plan.submission_key, plan)
+
+
+def test_crash_recovery_rejects_a_mutated_or_mismatched_plan(tmp_path: Path) -> None:
+    lifecycle, _, _, _, sink, _ = _lifecycle(tmp_path)
+    plan = _plan(sink, _limits(), (("pub-a", 1),))
+    plan.submission_key = "canonical-recovery-key"
+    plan.plan_hash = submission_plan_hash(plan)
+    plan.plan_id = "mutated-after-hash"
+
+    with pytest.raises(BatchRecoveryError, match="canonical hash"):
+        lifecycle.recover_jobs_by_submission_key(plan.submission_key, plan)
+
+    plan.plan_id = "plan-batch-lifecycle"
+    plan.plan_hash = submission_plan_hash(plan)
+    with pytest.raises(BatchRecoveryError, match="does not match the recovery key"):
+        lifecycle.recover_jobs_by_submission_key("different-key", plan)
+
+
+def test_crash_recovery_not_found_is_typed(tmp_path: Path) -> None:
+    lifecycle, _, _, _, sink, _ = _lifecycle(tmp_path)
+    plan = _plan(sink, _limits(), (("pub-a", 1),))
+    plan.plan_hash = submission_plan_hash(plan)
+
+    recovered = lifecycle.recover_jobs_by_submission_key(plan.submission_key, plan)
+
+    assert recovered.state == "not_found"
+    assert recovered.batch_id is None
+    assert recovered.jobs == ()
+    assert recovered.missing_partition_ids == (plan.partitions[0].partition_id,)
+
+
+def test_crash_recovery_rejects_partition_gaps_duplicates_and_batch_drift(
+    tmp_path: Path,
+) -> None:
+    lifecycle, service, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
+    limits = _limits()
+    plan = _plan(sink, limits)
+    plan.plan_hash = submission_plan_hash(plan)
+    lifecycle.create_batch("ibm_test", limits)
+    lifecycle._submit_resolved_plan(
+        "batch-1", plan, submission_key=plan.submission_key, limits=limits
+    )
+    first, second = primitive_factory.jobs
+
+    service.tagged_jobs = [second]
+    with pytest.raises(BatchRecoveryError, match="partition prefix"):
+        lifecycle.recover_jobs_by_submission_key(plan.submission_key, plan)
+
+    duplicate = FakeJob(
+        "duplicate-partition-job",
+        tags=first.tags,
+        session_id=first.session_id,
+    )
+    service.tagged_jobs = [first, duplicate]
+    with pytest.raises(BatchRecoveryError, match="same plan partition"):
+        lifecycle.recover_jobs_by_submission_key(plan.submission_key, plan)
+
+    second.session_id = "different-batch"
+    service.tagged_jobs = [first, second]
+    with pytest.raises(BatchRecoveryError, match="multiple Runtime batches"):
+        lifecycle.recover_jobs_by_submission_key(plan.submission_key, plan)
+
+    second.session_id = first.session_id
+    second._job_id = first._job_id
+    service.tagged_jobs = [first, second]
+    with pytest.raises(BatchRecoveryError, match="same provider job_id"):
+        lifecycle.recover_jobs_by_submission_key(plan.submission_key, plan)
 
 
 def test_submission_rejects_unhashed_execution_option_drift(tmp_path: Path) -> None:
     lifecycle, _, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
     limits = _limits()
     plan = _plan(sink, limits)
+    plan.submission_key = "drift-key"
     plan.resolved_options["max_execution_time"] = 4
     lifecycle.create_batch("ibm_test", limits)
 
@@ -885,6 +1171,7 @@ def test_submission_rejects_fractional_sdk_execution_timeout(tmp_path: Path) -> 
     lifecycle, _, _, primitive_factory, sink, _ = _lifecycle(tmp_path)
     limits = _limits()
     plan = _plan(sink, limits)
+    plan.submission_key = "fractional-key"
     plan.maximum_execution_seconds = 4.5
     plan.resolved_options["max_execution_time"] = 4.5
     lifecycle.create_batch("ibm_test", limits)

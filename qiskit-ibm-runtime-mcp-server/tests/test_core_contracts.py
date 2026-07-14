@@ -60,6 +60,7 @@ from qiskit_ibm_runtime_mcp_server.core.models import (
     PubExecutionEstimate,
     PubShape,
     PUBLIC_MODELS,
+    RecoveredJobReceipt,
     RecoveredSubmissionStatus,
     RuntimeUsage,
     SamplerPubResult,
@@ -71,6 +72,7 @@ from qiskit_ibm_runtime_mcp_server.core.models import (
     SubmissionPartition,
     SubmissionPlan,
     SubmissionKeyStatus,
+    SubmissionRecovery,
     UsageReconciliation,
 )
 from qiskit_ibm_runtime_mcp_server.core.schemas import (
@@ -259,6 +261,21 @@ def _public_instances() -> list[object]:
         job_id="job-1",
         pub_ids=("sampler-0",),
         submitted_at=NOW,
+    )
+    recovered_job_receipt = RecoveredJobReceipt(
+        schema_version="1.0",
+        submission_key="fixture-key",
+        plan_id="fixture-plan",
+        plan_hash=HASH_A,
+        primitive="sampler",
+        batch_id="batch-1",
+        partition_id="part-0",
+        job_id="job-1",
+        pub_ids=("sampler-0",),
+        submitted_at=NOW,
+        submission_time_source="wrapper_pre_submit_job_tag",
+        provider_created_at=NOW,
+        status="DONE",
     )
     submission_receipt = BatchSubmissionReceipt(
         schema_version="1.0",
@@ -520,6 +537,19 @@ def _public_instances() -> list[object]:
             jobs=(batch_job,),
             observed_at=NOW,
         ),
+        recovered_job_receipt,
+        SubmissionRecovery(
+            schema_version="1.0",
+            submission_key="fixture-key",
+            plan_id="fixture-plan",
+            plan_hash=HASH_A,
+            primitive="sampler",
+            batch_id="batch-1",
+            state="complete",
+            jobs=(recovered_job_receipt,),
+            missing_partition_ids=(),
+            observed_at=NOW,
+        ),
         sampler_register,
         sampler_result,
         InlineJsonValue(
@@ -568,6 +598,50 @@ def test_every_public_model_round_trips_and_validates_against_schema() -> None:
         Draft202012Validator(generated_schemas()[filename]).validate(payload)
         restored = model_type.model_validate_json(instance.model_dump_json())
         assert restored.model_dump(mode="json") == payload
+
+
+def test_submission_recovery_requires_nonempty_unique_complete_evidence() -> None:
+    with pytest.raises(ValidationError, match="at least one job"):
+        SubmissionRecovery(
+            schema_version="1.0",
+            submission_key="fixture-key",
+            plan_id="fixture-plan",
+            plan_hash=HASH_A,
+            primitive="sampler",
+            batch_id=None,
+            state="complete",
+            jobs=(),
+            missing_partition_ids=(),
+            observed_at=NOW,
+        )
+
+    first = RecoveredJobReceipt(
+        schema_version="1.0",
+        submission_key="fixture-key",
+        plan_id="fixture-plan",
+        plan_hash=HASH_A,
+        primitive="sampler",
+        batch_id="batch-1",
+        partition_id="part-0",
+        job_id="duplicate-job",
+        pub_ids=("pub-0",),
+        submitted_at=NOW,
+        status="DONE",
+    )
+    second = first.model_copy(update={"partition_id": "part-1", "pub_ids": ("pub-1",)})
+    with pytest.raises(ValidationError, match="unique job_id"):
+        SubmissionRecovery(
+            schema_version="1.0",
+            submission_key="fixture-key",
+            plan_id="fixture-plan",
+            plan_hash=HASH_A,
+            primitive="sampler",
+            batch_id="batch-1",
+            state="complete",
+            jobs=(first, second),
+            missing_partition_ids=(),
+            observed_at=NOW,
+        )
 
 
 def test_schema_version_is_required_and_rejects_unsupported_versions() -> None:

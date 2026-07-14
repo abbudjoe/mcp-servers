@@ -13,6 +13,30 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 All notable changes to `qiskit-ibm-runtime-mcp-server` are documented here.
 Package versions and JSON wire-schema versions are independent.
 
+## 0.7.2 — 2026-07-14
+
+### Fixed
+
+- Replaced unsafe restart inventory with plan-bound `SubmissionRecovery` and
+  `RecoveredJobReceipt` contracts. Crash recovery now requires the exact
+  persisted `SubmissionPlan`, validates its canonical hash and every remote
+  identity tag, restores ordered plan/partition/PUB/job identity, and returns a
+  required wrapper-owned UTC pre-submit timestamp. Nullable provider
+  `creation_date` is retained only as optional corroboration.
+- Added fail-closed checks for submission-key drift, caller spoofing of reserved
+  tags, missing or contradictory recovery tags, duplicate/gapped partitions,
+  duplicate job IDs, jobs spanning multiple Runtime batches, and the provider's
+  eight-tag limit.
+
+### Compatibility
+
+- Jobs submitted by 0.7.0 or 0.7.1 do not contain the new wrapper submission-time
+  tag and therefore cannot satisfy typed crash recovery in 0.7.2. Preserve their
+  original local receipts; do not infer missing timestamps from nullable provider
+  metadata.
+- Added `RecoveredJobReceipt` and `SubmissionRecovery` schemas at wire-schema
+  version `1.0`; existing 1.0 schemas remain available.
+
 ## 0.7.1 — 2026-07-14
 
 ### Changed

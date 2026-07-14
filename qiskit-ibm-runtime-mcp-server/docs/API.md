@@ -8,7 +8,7 @@ obtain a copy of this license in the LICENSE file in the root directory
 of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 -->
 
-# Runtime Research API 0.7.x
+# Runtime Research API 0.7.2
 
 The supported Python contract lives under
 `qiskit_ibm_runtime_mcp_server.core`. Private names and the unchecked primitive
@@ -51,11 +51,23 @@ DataBin extension. Large values and execution-span masks become `ArtifactRef`s.
 
 - `BatchLifecycle`, `BatchExecutionLimits`, `plan_batch_partitions`
 - `SubmissionReceiptRegistry`, `BatchSubmissionReceipt`
-- `RecoveredSubmissionStatus`, `SubmissionKeyStatus`
+- `RecoveredSubmissionStatus`, `RecoveredJobReceipt`, `SubmissionRecovery`
 
 Submission keys are deterministic and receipts immutable. Reusing the same key
 cannot create another live submission unless an explicit duplicate policy says
-otherwise. Provider job tags are bounded before submission.
+otherwise. Provider job tags are bounded before submission, and the
+`qiskit-mcp-` namespace is wrapper-owned.
+
+Crash recovery calls
+`BatchLifecycle.recover_jobs_by_submission_key(plan.submission_key, plan)` with
+the exact persisted canonical `SubmissionPlan`. It validates key, plan, and
+partition tags; returns plan-ordered typed job identity and required tagged UTC
+pre-submit times; and fails closed on ambiguous or contradictory evidence.
+`provider_created_at` is nullable corroboration and never replaces the required
+wrapper time. Provider-account writers can mutate tags, so the recovery trust
+boundary includes principals with write access to that account.
+`SubmissionKeyStatus` is retained as a legacy raw-inventory schema and is not a
+receipt-reconstruction contract.
 
 ## Planning, budget, and approval
 

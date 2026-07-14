@@ -65,7 +65,7 @@
   "$id": "https://qiskit.org/schemas/runtime-research/v1.0/submission-key-status.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Remote job evidence recoverable from a deterministic submission key.",
+  "description": "Legacy provider inventory for a deterministic submission key.\n\nThis raw status shape is not sufficient to reconstruct a submission receipt.\nUse :class:`SubmissionRecovery` for crash recovery.",
   "properties": {
     "jobs": {
       "items": {

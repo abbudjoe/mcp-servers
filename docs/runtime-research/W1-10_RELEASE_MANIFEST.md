@@ -13,41 +13,51 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 ## Immutable identity
 
 - Distribution: `qiskit-ibm-runtime-mcp-server`
-- Version: `0.7.1`
-- Tag: `runtime-research-v0.7.1`
-- Tag object: `6ae1ff73b3a5541f5f49e7ce97ef2fbcd6ca9351`
-- Tested/peeled commit: `664a44c086f49c15279f814e205b15970e689fe0`
+- Version: `0.7.2`
+- Tag: `runtime-research-v0.7.2`
+- Tested/peeled commit: the exact object resolved by
+  `runtime-research-v0.7.2^{}`; the post-publication audit records its expanded
+  object ID in this manifest on the release branch
 - Remote: `https://github.com/abbudjoe/mcp-servers.git`
 
 ## Dependency pin
 
 ```text
-qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.1#subdirectory=qiskit-ibm-runtime-mcp-server
+qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.2#subdirectory=qiskit-ibm-runtime-mcp-server
 ```
 
 An isolated CPython 3.12 installation from this exact requirement resolved to
-the tested commit and passed the installed-package probe for version `0.7.1`,
-35 generated/packaged schemas, and empty Runtime execution-span serialization.
+the tested commit and passed the installed-package probe for version `0.7.2`,
+37 generated/packaged schemas, `RecoveredJobReceipt`, and
+`SubmissionRecovery`.
 
 ## Evidence hashes
 
 | Artifact | SHA-256 |
 |---|---|
-| `uv.lock` | `ee8dd3b8441558bf4c7f6bfc50548776104ad4a6565536c5d3104425a45379ef` |
-| `qiskit_ibm_runtime_mcp_server-0.7.1-py3-none-any.whl` | `1b6341f913d8a9e826031fd1926cbde1dadfa972c4905a51f1315ab0659aaee6` |
-| `qiskit_ibm_runtime_mcp_server-0.7.1.tar.gz` | `99b8bb03b4f33082a6ffa4a0e59aebe6668db942d3ebc8cf6cb8e05805461d14` |
+| `uv.lock` | `e54af79a029c06b4768dd5aafa22faa960e286ee9a4b84003a950ee7180521e4` |
+| `qiskit_ibm_runtime_mcp_server-0.7.2-py3-none-any.whl` | `128f5a9a3cbf3863b9184b7bab7f561da835ac13ac1068ce77d014f6e0da59f7` |
+| `qiskit_ibm_runtime_mcp_server-0.7.2.tar.gz` | `39a76afd2c7740dc2299165886d1c631f0a15149f5bc1c870e292488c8139509` |
 
-The annotated tag repeats these hashes. Its human-written `Tested commit` line
-contains an expanded-hash typo beginning with the same short `664a44c`; the Git
-tag target is not affected. The remote peeled ref and clean-install resolver
-both identify the authoritative commit recorded above. The published tag was
-left immutable rather than rewritten to conceal the annotation error.
+The build used `SOURCE_DATE_EPOCH=1784059200`. Both the wheel and sdist passed
+isolated Python 3.12 installs and exposed version `0.7.2` and all 37 schemas.
+The annotated tag repeats the three hashes above.
 
 ## Safety coverage
 
 The supported Python 3.10–3.14 matrix enforced branch-only coverage per module:
 
+- Runtime suite: 405 passed and one explicitly gated read-only integration skip
+  on every interpreter;
 - approval consumption: 100.00%;
 - budgeting and approval validation: 91.07%;
 - Primitive result parsing: 90.91%;
 - secret handling: 100.00%.
+
+## Superseded recovery contract
+
+Release `0.7.1` remains immutable at tag `runtime-research-v0.7.1`, tag object
+`6ae1ff73b3a5541f5f49e7ce97ef2fbcd6ca9351`, peeled commit
+`664a44c086f49c15279f814e205b15970e689fe0`. It is not a Workstream 2 recovery
+pin because its restart inventory lacks typed plan/partition/PUB identity and a
+required wrapper-owned submission timestamp.
