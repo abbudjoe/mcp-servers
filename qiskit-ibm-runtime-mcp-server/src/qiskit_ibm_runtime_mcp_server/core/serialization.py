@@ -24,6 +24,7 @@ from typing import Any
 
 import numpy as np
 from pydantic import BaseModel, JsonValue
+from qiskit_ibm_runtime.execution_span import ExecutionSpan, ExecutionSpans
 
 
 class JsonConversionError(TypeError):
@@ -77,6 +78,28 @@ def to_json_safe(value: Any) -> JsonValue:
         if np.isnat(value):
             raise JsonConversionError("NumPy NaT is not valid canonical JSON")
         return str(np.datetime_as_string(value, unit="ns", timezone="UTC"))
+    if isinstance(value, ExecutionSpans):
+        return {
+            "$runtime_type": "ExecutionSpans",
+            "start": to_json_safe(value.start),
+            "stop": to_json_safe(value.stop),
+            "duration": to_json_safe(value.duration),
+            "pub_idxs": to_json_safe(value.pub_idxs),
+            "spans": [to_json_safe(span) for span in value],
+        }
+    if isinstance(value, ExecutionSpan):
+        return {
+            "$runtime_type": type(value).__name__,
+            "start": to_json_safe(value.start),
+            "stop": to_json_safe(value.stop),
+            "duration": to_json_safe(value.duration),
+            "size": to_json_safe(value.size),
+            "pub_idxs": to_json_safe(value.pub_idxs),
+            "masks": {
+                str(pub_idx): to_json_safe(value.mask(pub_idx))
+                for pub_idx in value.pub_idxs
+            },
+        }
     if isinstance(value, np.generic):
         raise JsonConversionError(
             f"NumPy {value.dtype} has no supported JSON representation"
