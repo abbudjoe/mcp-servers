@@ -37,6 +37,8 @@ from collections.abc import Callable, Coroutine
 from functools import wraps
 from typing import Any, TypeVar
 
+from qiskit_ibm_runtime_mcp_server.security import redact_data, redact_text
+
 
 F = TypeVar("F", bound=Callable[..., Any])
 T = TypeVar("T")
@@ -76,8 +78,15 @@ def with_sync(func: F) -> F:
     """
 
     @wraps(func)
-    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-        return _run_async(lambda: func(*args, **kwargs))
+    async def secure_async_wrapper(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return redact_data(await func(*args, **kwargs))
+        except Exception as exc:
+            raise RuntimeError(redact_text(exc)) from None
 
-    func.sync = sync_wrapper  # type: ignore[attr-defined]
-    return func
+    @wraps(func)
+    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+        return _run_async(lambda: secure_async_wrapper(*args, **kwargs))
+
+    secure_async_wrapper.sync = sync_wrapper  # type: ignore[attr-defined]
+    return secure_async_wrapper  # type: ignore[return-value]

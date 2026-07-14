@@ -96,12 +96,10 @@ pip install langchain-ibm          # For IBM Watsonx
 4. **Set up environment variables:**
 
 ```bash
-# IBM Quantum token (required for all providers)
+# IBM Quantum token (optional when existing Qiskit saved credentials are available)
 export QISKIT_IBM_TOKEN="your-ibm-quantum-token"
 
-# IBM Quantum instance (HIGHLY RECOMMENDED for faster startup)
-# Without this, the service searches all instances which is slow (~10-30 seconds).
-# With instance set, startup is ~2-3 seconds.
+# IBM Quantum instance (required; the server never searches across instances)
 # Find your available instances by running:
 #   python -c "from qiskit_ibm_runtime import QiskitRuntimeService; s = QiskitRuntimeService(); print([i['name'] for i in s.instances()])"
 # Or at: https://quantum.ibm.com/ -> Administration -> Instances
@@ -127,7 +125,7 @@ Or create a `.env` file:
 
 ```env
 QISKIT_IBM_TOKEN=your-ibm-quantum-token
-QISKIT_IBM_RUNTIME_MCP_INSTANCE=your-instance-name  # Recommended for faster startup
+QISKIT_IBM_RUNTIME_MCP_INSTANCE=your-instance-name  # Required for live Runtime operations
 OPENAI_API_KEY=your-openai-api-key
 
 # For Watsonx
@@ -227,7 +225,6 @@ The agent has access to these tools provided by the MCP server:
 
 | Tool | Description |
 |------|-------------|
-| `setup_ibm_quantum_account_tool` | Set up IBM Quantum account with credentials |
 | `list_backends_tool` | List all available quantum backends |
 | `least_busy_backend_tool` | Find the least busy operational backend |
 | `get_backend_properties_tool` | Get detailed properties of a specific backend |
@@ -241,7 +238,6 @@ The agent has access to these tools provided by the MCP server:
 | `get_job_status_tool` | Get status of a specific job |
 | `get_job_results_tool` | Retrieve results from a completed job |
 | `cancel_job_tool` | Cancel a running or queued job |
-| `delete_saved_account_tool` | Delete a saved IBM Quantum account from disk |
 | `list_saved_accounts_tool` | List all saved IBM Quantum accounts |
 | `active_account_info_tool` | Get info about the currently active account |
 | `active_instance_info_tool` | Get the CRN of the active instance |

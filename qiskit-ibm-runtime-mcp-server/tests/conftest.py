@@ -21,25 +21,31 @@ from qiskit_ibm_runtime import QiskitRuntimeService
 
 @pytest.fixture(autouse=True)
 def reset_service():
-    """Reset the global service instance before each test."""
+    """Reset Runtime state and provide a synthetic explicit instance."""
     import qiskit_ibm_runtime_mcp_server.ibm_runtime
 
-    # Reset service to None before each test
-    qiskit_ibm_runtime_mcp_server.ibm_runtime.service = None
-    yield
-    # Reset service to None after each test
-    qiskit_ibm_runtime_mcp_server.ibm_runtime.service = None
+    with patch.dict(
+        os.environ,
+        {"QISKIT_IBM_RUNTIME_MCP_INSTANCE": "test-instance"},
+        clear=False,
+    ):
+        qiskit_ibm_runtime_mcp_server.ibm_runtime.service = None
+        qiskit_ibm_runtime_mcp_server.ibm_runtime._service_instance = None
+        yield
+        qiskit_ibm_runtime_mcp_server.ibm_runtime.service = None
+        qiskit_ibm_runtime_mcp_server.ibm_runtime._service_instance = None
 
 
 @pytest.fixture
 def mock_env_vars():
-    """Mock environment variables for testing."""
+    """Mock non-secret Runtime configuration for testing."""
     with patch.dict(
         os.environ,
         {
-            "QISKIT_IBM_TOKEN": "test_token_12345",
             "QISKIT_IBM_CHANNEL": "ibm_quantum_platform",
+            "QISKIT_IBM_RUNTIME_MCP_INSTANCE": "test-instance",
         },
+        clear=False,
     ):
         yield
 

@@ -26,6 +26,7 @@ from qiskit_ibm_runtime.fake_provider import FakeProviderForBackendV2
 from qiskit_ibm_runtime.options import EstimatorOptions, SamplerOptions
 from qiskit_mcp_server.circuit_serialization import CircuitFormat, load_circuit
 
+from qiskit_ibm_runtime_mcp_server.security import install_secret_redaction
 from qiskit_ibm_runtime_mcp_server.utils import with_sync
 
 
@@ -34,6 +35,7 @@ DDSequenceType = Literal["XX", "XpXm", "XY4"]
 
 # Configure logging
 logger = logging.getLogger(__name__)
+install_secret_redaction(logger)
 
 
 def get_instance_from_env() -> str | None:
@@ -80,7 +82,7 @@ def least_busy(backends: list[Any]) -> Any | None:
     return operational_backends[0][0]
 
 
-def get_token_from_env() -> str | None:
+def _get_token_from_env() -> str | None:
     """
     Get IBM Quantum token from environment variables.
 
@@ -99,6 +101,7 @@ def get_token_from_env() -> str | None:
 
 # Global service instance
 service: QiskitRuntimeService | None = None
+_service_instance: str | None = None
 
 # Thread pool for parallel backend operations (limit concurrent API calls)
 _backend_executor = ThreadPoolExecutor(max_workers=10)
@@ -154,30 +157,38 @@ def _process_coupling_map(
     return result
 
 
-def _create_runtime_service(channel: str, instance: str | None) -> QiskitRuntimeService:
+def require_runtime_instance(instance: str | None = None) -> str:
+    """Resolve the required Runtime instance without implicit account discovery."""
+    resolved = (
+        instance.strip() if instance and instance.strip() else get_instance_from_env()
+    )
+    if resolved is None:
+        raise ValueError(
+            "An explicit IBM Quantum Runtime instance is required. Set "
+            "QISKIT_IBM_RUNTIME_MCP_INSTANCE before using live Runtime operations."
+        )
+    return resolved
+
+
+def _create_runtime_service(channel: str, instance: str) -> QiskitRuntimeService:
     """
-    Create a QiskitRuntimeService instance with the given channel and optional instance.
+    Create a QiskitRuntimeService instance for an explicit instance.
 
     Args:
         channel: Service channel ('ibm_quantum_platform')
-        instance: IBM Quantum instance (CRN or service name), or None
+        instance: Required IBM Quantum instance (CRN or service name)
 
     Returns:
         QiskitRuntimeService: New service instance
     """
-    if instance:
-        logger.info(f"Initializing with instance: {instance}")
-        return QiskitRuntimeService(channel=channel, instance=instance)
-    else:
-        logger.info(
-            "No instance specified - service will search all instances (slower). "
-            "Set QISKIT_IBM_RUNTIME_MCP_INSTANCE for faster startup."
-        )
-        return QiskitRuntimeService(channel=channel)
+    token = _get_token_from_env()
+    logger.info("Initializing IBM Runtime service for explicit instance: %s", instance)
+    if token is not None:
+        return QiskitRuntimeService(channel=channel, instance=instance, token=token)
+    return QiskitRuntimeService(channel=channel, instance=instance)
 
 
 def initialize_service(
-    token: str | None = None,
     channel: str = "ibm_quantum_platform",
     instance: str | None = None,
 ) -> QiskitRuntimeService:
@@ -185,124 +196,33 @@ def initialize_service(
     Initialize the Qiskit IBM Runtime service.
 
     Args:
-        token: IBM Quantum API token (optional if saved)
         channel: Service channel ('ibm_quantum_platform')
-        instance: IBM Quantum instance (e.g., 'ibm-q/open/main'). If provided,
-                 significantly speeds up initialization by skipping instance lookup.
+        instance: IBM Quantum instance. If omitted, the required
+            QISKIT_IBM_RUNTIME_MCP_INSTANCE environment value is used.
 
     Returns:
         QiskitRuntimeService: Initialized service instance
     """
-    global service
+    global service, _service_instance
 
-    # Return existing service if already initialized (singleton pattern)
-    if service is not None and token is None:
+    resolved_instance = require_runtime_instance(instance)
+
+    # A service is owned by exactly one explicit Runtime instance.
+    if service is not None and _service_instance == resolved_instance:
         return service
 
-    # Check for instance in environment if not explicitly provided
-    if instance is None:
-        instance = get_instance_from_env()
-
     try:
-        # First, try to initialize from saved credentials (unless a new token is explicitly provided)
-        if not token:
-            try:
-                service = _create_runtime_service(channel, instance)
-                logger.info(
-                    f"Successfully initialized IBM Runtime service from saved credentials on channel: {channel}"
-                )
-                return service
-            except Exception as e:
-                logger.info(f"No saved credentials found or invalid: {e}")
-                raise ValueError(
-                    "No IBM Quantum token provided and no saved credentials available"
-                ) from e
-
-        # If a token is provided, validate it's not a placeholder before saving
-        if token and token.strip():
-            # Check for common placeholder patterns
-            if token.strip() in ["<PASSWORD>", "<TOKEN>", "YOUR_TOKEN_HERE", "xxx"]:
-                raise ValueError(
-                    f"Invalid token: '{token.strip()}' appears to be a placeholder value"
-                )
-
-            # Save account with provided token
-            try:
-                QiskitRuntimeService.save_account(
-                    channel=channel, token=token.strip(), overwrite=True
-                )
-                logger.info(f"Saved IBM Quantum account for channel: {channel}")
-            except Exception as e:
-                logger.error(f"Failed to save account: {e}")
-                raise ValueError("Invalid token or channel") from e
-
-            # Initialize service with the new token
-            try:
-                service = _create_runtime_service(channel, instance)
-                logger.info(
-                    f"Successfully initialized IBM Runtime service on channel: {channel}"
-                )
-                return service
-            except Exception as e:
-                logger.error(f"Failed to initialize IBM Runtime service: {e}")
-                raise
-
+        service = _create_runtime_service(channel, resolved_instance)
+        _service_instance = resolved_instance
+        logger.info(
+            "Successfully initialized IBM Runtime service on channel: %s", channel
+        )
+        return service
     except Exception as e:
-        if not isinstance(e, ValueError):
-            logger.error(f"Failed to initialize IBM Runtime service: {e}")
-        raise
-
-
-@with_sync
-async def setup_ibm_quantum_account(
-    token: str | None = None, channel: str = "ibm_quantum_platform"
-) -> dict[str, Any]:
-    """
-    Set up IBM Quantum account with credentials.
-
-    Args:
-        token: IBM Quantum API token (optional - will try environment or saved credentials)
-        channel: Service channel ('ibm_quantum_platform')
-
-    Returns:
-        Setup status and information
-    """
-    # Try to get token from environment if not provided
-    if not token or not token.strip():
-        env_token = get_token_from_env()
-        if env_token:
-            logger.info("Using token from QISKIT_IBM_TOKEN environment variable")
-            token = env_token
-        else:
-            # Try to use saved credentials
-            logger.info("No token provided, attempting to use saved credentials")
-            token = None
-
-    if channel not in ["ibm_quantum_platform"]:
-        return {
-            "status": "error",
-            "message": "Channel must be 'ibm_quantum_platform'",
-        }
-
-    try:
-        service_instance = initialize_service(token.strip() if token else None, channel)
-
-        # Get backend count for response
-        try:
-            backends = service_instance.backends()
-            backend_count = len(backends)
-        except Exception:
-            backend_count = 0
-
-        return {
-            "status": "success",
-            "message": f"IBM Quantum account set up successfully for channel: {channel}",
-            "channel": service_instance._channel,
-            "available_backends": backend_count,
-        }
-    except Exception as e:
-        logger.error(f"Failed to set up IBM Quantum account: {e}")
-        return {"status": "error", "message": f"Failed to set up account: {e!s}"}
+        logger.error("Failed to initialize IBM Runtime service: %s", e)
+        raise ValueError(
+            "Unable to initialize IBM Runtime using QISKIT_IBM_TOKEN or saved credentials"
+        ) from None
 
 
 def _fetch_backend_info(backend: Any) -> dict[str, Any]:
@@ -2380,48 +2300,6 @@ c = measure q;
 
 
 @with_sync
-async def delete_saved_account(account_name: str) -> dict[str, Any]:
-    """
-    Delete a saved IBM Quantum account from disk.
-
-    **WARNING: DESTRUCTIVE OPERATION**
-    This permanently removes saved credentials on ~/.qiskit/qiskit-ibm.json.
-    The operation CANNOT be undone. Deleted credentials must be re-entered to restore access.
-
-    Args:
-        account_name: Name of the saved account to delete. Use list_saved_accounts()
-                     to find available account names. Account names are typically in
-                     the format 'ibm_quantum_platform' or custom names set during save.
-
-    Returns:
-        Dictionary containing deletion status:
-        - On success: {"status": "success", "deleted": True, "message": "Account successfully deleted"}
-        - On failure: {"status": "error", "deleted": False, "message": "Account name not found or could not be deleted"}
-        - On error: {"status": "error", "deleted": False, "message": error_message}
-
-    """
-    try:
-        is_deleted = QiskitRuntimeService.delete_account(name=account_name)
-
-        if is_deleted:
-            return {
-                "status": "success",
-                "deleted": True,
-                "message": "Account successfully deleted",
-            }
-        else:
-            return {
-                "status": "error",
-                "deleted": False,
-                "message": "Account name not found or could not be deleted",
-            }
-
-    except Exception as e:
-        logger.error(f"Failed to delete account: {e}")
-        return {"status": "error", "deleted": False, "message": str(e)}
-
-
-@with_sync
 async def list_saved_accounts() -> dict[str, Any]:
     """
     List all IBM Quantum accounts saved on disk.
@@ -2473,7 +2351,7 @@ async def active_account_info() -> dict[str, Any]:
         account_info including:
           * "channel": Service channel (e.g., 'ibm_quantum')
           * "url"
-          * "token": API token (masked for security, showing only last 4 characters)
+          * secret-bearing fields are redacted at the public result boundary
           * "verify"
           * "private_endpoint"
         - On error: {"status": "error", "message": error_message}
@@ -2484,7 +2362,7 @@ async def active_account_info() -> dict[str, Any]:
         if service is None:
             service = initialize_service()
         account_info = service.active_account()
-        # Mask the token for security - show only last 4 characters
+        # The public result boundary fully redacts this field.
         if account_info and "token" in account_info and account_info["token"]:
             token = account_info["token"]
             account_info = account_info.copy()  # Don't modify the original
