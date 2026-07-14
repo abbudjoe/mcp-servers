@@ -93,15 +93,26 @@ def _circuit() -> CircuitArtifact:
         schema_version="1.0",
         artifact=_artifact_ref(),
         format="qpy",
-        circuit_hash=HASH_B,
+        circuit_hash=HASH_A,
         num_qubits=2,
         num_clbits=2,
         size=3,
         depth=2,
         parameter_names=["theta"],
+        registers=[
+            {"kind": "quantum", "name": "q", "size": 2, "bit_indices": [0, 1]},
+            {"kind": "classical", "name": "c", "size": 2, "bit_indices": [0, 1]},
+        ],
+        metadata={"experiment": "fixture"},
         qiskit_version="2.4.2",
+        reader_qiskit_version="2.4.2",
         qpy_version=17,
+        qpy_symbolic_encoding="p",
         layout={"physical_qubits": [0, 1]},
+        provenance={
+            "transformation": "source",
+            "software_versions": {"qiskit": "2.4.2"},
+        },
     )
 
 

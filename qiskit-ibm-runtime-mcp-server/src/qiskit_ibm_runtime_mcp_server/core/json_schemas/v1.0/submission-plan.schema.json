@@ -95,6 +95,11 @@
           ],
           "title": "Layout"
         },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        },
         "num_clbits": {
           "minimum": 0,
           "title": "Num Clbits",
@@ -112,10 +117,33 @@
           "title": "Parameter Names",
           "type": "array"
         },
+        "provenance": {
+          "$ref": "#/$defs/CircuitProvenance"
+        },
         "qiskit_version": {
-          "minLength": 1,
-          "title": "Qiskit Version",
-          "type": "string"
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Qiskit Version"
+        },
+        "qpy_symbolic_encoding": {
+          "anyOf": [
+            {
+              "maxLength": 1,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Qpy Symbolic Encoding"
         },
         "qpy_version": {
           "anyOf": [
@@ -128,6 +156,18 @@
             }
           ],
           "title": "Qpy Version"
+        },
+        "reader_qiskit_version": {
+          "minLength": 1,
+          "title": "Reader Qiskit Version",
+          "type": "string"
+        },
+        "registers": {
+          "items": {
+            "$ref": "#/$defs/CircuitRegister"
+          },
+          "title": "Registers",
+          "type": "array"
         },
         "schema_version": {
           "const": "1.0",
@@ -150,11 +190,164 @@
         "size",
         "depth",
         "parameter_names",
+        "registers",
+        "metadata",
         "qiskit_version",
+        "reader_qiskit_version",
         "qpy_version",
-        "layout"
+        "qpy_symbolic_encoding",
+        "layout",
+        "provenance"
       ],
       "title": "CircuitArtifact",
+      "type": "object"
+    },
+    "CircuitProvenance": {
+      "additionalProperties": true,
+      "description": "Typed origin and transformation record for immutable circuit bytes.",
+      "properties": {
+        "compiler_target_hash": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compiler Target Hash"
+        },
+        "software_versions": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Software Versions",
+          "type": "object"
+        },
+        "source_artifact_id": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Artifact Id"
+        },
+        "source_circuit_hash": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Circuit Hash"
+        },
+        "target_hash": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Hash"
+        },
+        "target_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Name"
+        },
+        "transformation": {
+          "enum": [
+            "source",
+            "transpile"
+          ],
+          "title": "Transformation",
+          "type": "string"
+        },
+        "transpiler_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transpiler Name"
+        },
+        "transpiler_options": {
+          "additionalProperties": true,
+          "title": "Transpiler Options",
+          "type": "object"
+        }
+      },
+      "required": [
+        "transformation",
+        "software_versions"
+      ],
+      "title": "CircuitProvenance",
+      "type": "object"
+    },
+    "CircuitRegister": {
+      "additionalProperties": true,
+      "description": "One named register and its exact positions in the circuit bit arrays.",
+      "properties": {
+        "bit_indices": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Bit Indices",
+          "type": "array"
+        },
+        "kind": {
+          "enum": [
+            "quantum",
+            "classical"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "size",
+        "bit_indices"
+      ],
+      "title": "CircuitRegister",
       "type": "object"
     },
     "EstimatorPubSpec": {
