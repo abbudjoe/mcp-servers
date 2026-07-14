@@ -38,6 +38,12 @@ SCHEMA_VERSION: Literal["1.0"] = "1.0"
 SchemaVersion = Literal["1.0"]
 Sha256Id = str
 
+# Locked against qiskit-ibm-runtime 0.45.1 and the qualified IBM Runtime
+# service contract. Caller policies may only choose lower limits.
+LOCKED_MAX_JOB_EXECUTION_SECONDS = 10_800
+LOCKED_MAX_BATCH_TTL_SECONDS = 28_800
+LOCKED_BATCH_INTERACTIVE_TTL_SECONDS = 60
+
 
 class ContractModel(BaseModel):
     """Base contract that preserves future fields and serializes them safely."""
@@ -61,6 +67,16 @@ class VersionedContractModel(ContractModel):
     """Base for every independently persisted public contract."""
 
     schema_version: SchemaVersion
+
+
+class FrozenVersionedContractModel(VersionedContractModel):
+    """Deep-structure-friendly base for immutable control-plane records.
+
+    Subclasses use tuples and scalar fields exclusively so ``frozen=True`` cannot
+    be bypassed by mutating a nested list or dictionary.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
 
 
 class ArtifactRef(VersionedContractModel):
@@ -533,6 +549,164 @@ class RuntimeUsage(VersionedContractModel):
     extensions: dict[str, Any] = Field(default_factory=dict)
 
 
+class BatchExecutionLimits(FrozenVersionedContractModel):
+    """Explicit caller bounds beneath the locked Runtime service ceilings."""
+
+    max_jobs: PositiveInt
+    max_pubs_per_job: PositiveInt
+    max_estimated_qpu_seconds_per_job: PositiveFloat
+    max_execution_seconds_per_job: PositiveInt
+    batch_max_time_seconds: PositiveInt
+    ttl_margin_seconds: NonNegativeInt = LOCKED_BATCH_INTERACTIVE_TTL_SECONDS
+
+    @model_validator(mode="after")
+    def _limits_fit_locked_runtime_contract(self) -> BatchExecutionLimits:
+        if self.max_execution_seconds_per_job > LOCKED_MAX_JOB_EXECUTION_SECONDS:
+            raise ValueError(
+                "max_execution_seconds_per_job exceeds the locked Runtime "
+                "three-hour service ceiling"
+            )
+        if self.batch_max_time_seconds > LOCKED_MAX_BATCH_TTL_SECONDS:
+            raise ValueError(
+                "batch_max_time_seconds exceeds the locked Runtime eight-hour ceiling"
+            )
+        if self.ttl_margin_seconds >= self.batch_max_time_seconds:
+            raise ValueError("ttl_margin_seconds must leave positive usable Batch TTL")
+        if (
+            self.max_execution_seconds_per_job
+            > self.batch_max_time_seconds - self.ttl_margin_seconds
+        ):
+            raise ValueError(
+                "per-job execution limit must fit inside Batch TTL after its margin"
+            )
+        return self
+
+
+class PubExecutionEstimate(FrozenVersionedContractModel):
+    """One caller-supplied generic PUB execution estimate used for partitioning."""
+
+    pub_id: str = Field(min_length=1)
+    estimated_qpu_seconds: NonNegativeFloat
+
+
+class BatchReference(FrozenVersionedContractModel):
+    """Stable identity returned when a Runtime Batch is created or reattached."""
+
+    batch_id: str = Field(min_length=1)
+    instance_id: str = Field(min_length=1)
+    backend_name: str = Field(min_length=1)
+    maximum_time_seconds: PositiveInt
+    observed_at: AwareDatetime
+
+
+class BatchStatus(FrozenVersionedContractModel):
+    """Typed status and TTL metadata recovered from a Runtime Batch."""
+
+    batch_id: str = Field(min_length=1)
+    status: str | None
+    accepting_jobs: bool | None
+    maximum_time_seconds: NonNegativeInt | None
+    interactive_timeout_seconds: NonNegativeInt | None
+    started_at: AwareDatetime | None
+    closed_at: AwareDatetime | None
+    observed_at: AwareDatetime
+
+
+class BatchJobStatus(FrozenVersionedContractModel):
+    """Minimal immutable status for one job belonging to a Batch."""
+
+    batch_id: str = Field(min_length=1)
+    job_id: str = Field(min_length=1)
+    status: str | None
+    created_at: AwareDatetime | None
+    tags: tuple[str, ...] = ()
+
+
+class BatchJobUsage(FrozenVersionedContractModel):
+    """Per-job QPU usage recovered without interpreting scientific results."""
+
+    job_id: str = Field(min_length=1)
+    quantum_seconds: NonNegativeFloat | None
+
+
+class BatchUsage(FrozenVersionedContractModel):
+    """Batch-wide and per-job usage for caller-owned reconciliation."""
+
+    batch_id: str = Field(min_length=1)
+    batch_seconds: NonNegativeFloat | None
+    jobs: tuple[BatchJobUsage, ...]
+    retrieved_at: AwareDatetime
+
+
+class BatchJobReceipt(FrozenVersionedContractModel):
+    """Immutable acknowledgement for one submitted plan partition."""
+
+    partition_id: str = Field(min_length=1)
+    job_id: str = Field(min_length=1)
+    pub_ids: tuple[str, ...] = Field(min_length=1)
+    submitted_at: AwareDatetime
+
+
+class BatchSubmissionFailure(FrozenVersionedContractModel):
+    """Immutable failure boundary retained alongside any accepted jobs."""
+
+    partition_id: str = Field(min_length=1)
+    error_type: str = Field(min_length=1)
+    message: str = Field(min_length=1)
+    failed_at: AwareDatetime
+
+
+class BatchSubmissionReceipt(FrozenVersionedContractModel):
+    """Immutable, idempotency-bound receipt for one partitioned submission."""
+
+    submission_key: str = Field(min_length=1, max_length=256)
+    batch_id: str = Field(min_length=1)
+    plan_hash: Sha256Id = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    pub_ids: tuple[str, ...] = Field(min_length=1)
+    jobs: tuple[BatchJobReceipt, ...]
+    state: Literal["submitted", "partial_failure", "failed"]
+    reserved_at: AwareDatetime
+    completed_at: AwareDatetime
+    failure: BatchSubmissionFailure | None = None
+
+    @model_validator(mode="after")
+    def _receipt_state_matches_jobs_and_failure(self) -> BatchSubmissionReceipt:
+        submitted_pub_ids = tuple(pub_id for job in self.jobs for pub_id in job.pub_ids)
+        if submitted_pub_ids != self.pub_ids[: len(submitted_pub_ids)]:
+            raise ValueError("receipt jobs must preserve the plan PUB prefix order")
+        if self.state == "submitted":
+            if self.failure is not None or submitted_pub_ids != self.pub_ids:
+                raise ValueError(
+                    "submitted receipts require every PUB and cannot contain a failure"
+                )
+        elif self.failure is None:
+            raise ValueError("failed receipts require failure evidence")
+        if self.state == "partial_failure" and not self.jobs:
+            raise ValueError("partial_failure requires at least one accepted job")
+        if self.state == "failed" and self.jobs:
+            raise ValueError("failed receipts cannot contain an accepted job")
+        if self.completed_at < self.reserved_at:
+            raise ValueError("completed_at cannot precede reserved_at")
+        return self
+
+
+class RecoveredSubmissionStatus(FrozenVersionedContractModel):
+    """Current remote state recovered from an immutable submission receipt."""
+
+    receipt: BatchSubmissionReceipt
+    batch: BatchStatus
+    jobs: tuple[BatchJobStatus, ...]
+    observed_at: AwareDatetime
+
+
+class SubmissionKeyStatus(FrozenVersionedContractModel):
+    """Remote job evidence recoverable from a deterministic submission key."""
+
+    submission_key: str = Field(min_length=1, max_length=256)
+    jobs: tuple[BatchJobStatus, ...]
+    observed_at: AwareDatetime
+
+
 class InlineJsonValue(VersionedContractModel):
     """Explicit inline branch for values that may instead be artifact-backed."""
 
@@ -694,6 +868,18 @@ PUBLIC_MODELS: tuple[type[BaseModel], ...] = (
     SubmissionPlan,
     ApprovalReceipt,
     RuntimeUsage,
+    BatchExecutionLimits,
+    PubExecutionEstimate,
+    BatchReference,
+    BatchStatus,
+    BatchJobStatus,
+    BatchJobUsage,
+    BatchUsage,
+    BatchJobReceipt,
+    BatchSubmissionFailure,
+    BatchSubmissionReceipt,
+    RecoveredSubmissionStatus,
+    SubmissionKeyStatus,
     SamplerRegisterResult,
     SamplerPubResult,
     InlineJsonValue,

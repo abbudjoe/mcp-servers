@@ -38,6 +38,15 @@ from qiskit_ibm_runtime_mcp_server.core.models import (
     ApprovalReceipt,
     ArtifactRef,
     BackendSnapshot,
+    BatchExecutionLimits,
+    BatchJobReceipt,
+    BatchJobStatus,
+    BatchJobUsage,
+    BatchReference,
+    BatchStatus,
+    BatchSubmissionFailure,
+    BatchSubmissionReceipt,
+    BatchUsage,
     CircuitArtifact,
     EstimatorPubResult,
     EstimatorPubSpec,
@@ -45,7 +54,9 @@ from qiskit_ibm_runtime_mcp_server.core.models import (
     PauliObservables,
     ParameterBindings,
     PrimitiveResultEnvelope,
+    PubExecutionEstimate,
     PUBLIC_MODELS,
+    RecoveredSubmissionStatus,
     RuntimeUsage,
     SamplerPubResult,
     SamplerPubSpec,
@@ -54,6 +65,7 @@ from qiskit_ibm_runtime_mcp_server.core.models import (
     SparsePauliHamiltonian,
     SubmissionPartition,
     SubmissionPlan,
+    SubmissionKeyStatus,
 )
 from qiskit_ibm_runtime_mcp_server.core.schemas import (
     generated_schemas,
@@ -207,6 +219,52 @@ def _public_instances() -> list[object]:
         ),
     )
     usage = RuntimeUsage(schema_version="1.0", quantum_seconds=1.25, job_id="job-1")
+    batch_limits = BatchExecutionLimits(
+        schema_version="1.0",
+        max_jobs=2,
+        max_pubs_per_job=10,
+        max_estimated_qpu_seconds_per_job=60,
+        max_execution_seconds_per_job=60,
+        batch_max_time_seconds=600,
+        ttl_margin_seconds=60,
+    )
+    batch_job = BatchJobStatus(
+        schema_version="1.0",
+        batch_id="batch-1",
+        job_id="job-1",
+        status="DONE",
+        created_at=NOW,
+        tags=("fixture",),
+    )
+    batch_status = BatchStatus(
+        schema_version="1.0",
+        batch_id="batch-1",
+        status="Closed",
+        accepting_jobs=False,
+        maximum_time_seconds=600,
+        interactive_timeout_seconds=60,
+        started_at=NOW,
+        closed_at=NOW + timedelta(minutes=1),
+        observed_at=NOW + timedelta(minutes=1),
+    )
+    batch_job_receipt = BatchJobReceipt(
+        schema_version="1.0",
+        partition_id="part-0",
+        job_id="job-1",
+        pub_ids=("sampler-0",),
+        submitted_at=NOW,
+    )
+    submission_receipt = BatchSubmissionReceipt(
+        schema_version="1.0",
+        submission_key="fixture-key",
+        batch_id="batch-1",
+        plan_hash=HASH_A,
+        pub_ids=("sampler-0",),
+        jobs=(batch_job_receipt,),
+        state="submitted",
+        reserved_at=NOW,
+        completed_at=NOW,
+    )
     return [
         _artifact_ref(),
         _circuit(),
@@ -311,6 +369,56 @@ def _public_instances() -> list[object]:
             allowed_backends=["ibm_test"],
         ),
         usage,
+        batch_limits,
+        PubExecutionEstimate(
+            schema_version="1.0",
+            pub_id="sampler-0",
+            estimated_qpu_seconds=1.25,
+        ),
+        BatchReference(
+            schema_version="1.0",
+            batch_id="batch-1",
+            instance_id="crn:test",
+            backend_name="ibm_test",
+            maximum_time_seconds=600,
+            observed_at=NOW,
+        ),
+        batch_status,
+        batch_job,
+        BatchJobUsage(schema_version="1.0", job_id="job-1", quantum_seconds=1.25),
+        BatchUsage(
+            schema_version="1.0",
+            batch_id="batch-1",
+            batch_seconds=1.25,
+            jobs=(
+                BatchJobUsage(
+                    schema_version="1.0", job_id="job-1", quantum_seconds=1.25
+                ),
+            ),
+            retrieved_at=NOW,
+        ),
+        batch_job_receipt,
+        BatchSubmissionFailure(
+            schema_version="1.0",
+            partition_id="part-1",
+            error_type="RuntimeError",
+            message="fixture failure",
+            failed_at=NOW,
+        ),
+        submission_receipt,
+        RecoveredSubmissionStatus(
+            schema_version="1.0",
+            receipt=submission_receipt,
+            batch=batch_status,
+            jobs=(batch_job,),
+            observed_at=NOW + timedelta(minutes=1),
+        ),
+        SubmissionKeyStatus(
+            schema_version="1.0",
+            submission_key="fixture-key",
+            jobs=(batch_job,),
+            observed_at=NOW,
+        ),
         sampler_register,
         sampler_result,
         InlineJsonValue(
