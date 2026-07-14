@@ -20,7 +20,7 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 - Target contract: an immutable, clean-installable Runtime wrapper release with
   versioned schemas, an exact Workstream 2 dependency pin, and a generic,
   dependency-ordered upstream contribution series
-- Status: `in-progress`
+- Status: `met`
 - Live-compute policy: no QPU submission or paid-compute mutation is authorized
   or required for this workstream
 
@@ -34,7 +34,7 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 | Tag the exact tested commit and record lock/package hashes. | met | Annotated tag `runtime-research-v0.7.2` has tag object `0182e8b254b7e357b3738161d0cd9a6a720d3f01` and peels to tested commit `de40ebfcc28946c6424e6d54a8399aac111b2daa`; the annotation and release manifest record the lock, wheel, and sdist hashes. |
 | Make the pinned release accessible to Workstream 2. | met | The immutable tag and formal GitHub Release are published at `https://github.com/abbudjoe/mcp-servers`; an isolated Python 3.12 install from the exact tag resolved to the tested commit and verified package `0.7.2`, all 37 schemas, and the typed recovery models. |
 | Publish an experiment compatibility document. | met | `qiskit-ibm-runtime-mcp-server/docs/EXPERIMENT_COMPATIBILITY.md` records import paths, Python/stack requirements, environment variables, schema versions, modes, recovery trust boundary and limitations, exact tag pin, and W1-09 usage. |
-| Split upstreamable changes into dependency-ordered PRs without experiment-specific content. | met | PRs 1–10 were merged to `main` in dependency order after ancestry, content, Runtime/coverage, and offline-example gates passed. The recovery-contract repair is isolated as the next generic upstream contribution. |
+| Split upstreamable changes into dependency-ordered PRs without experiment-specific content. | met | PRs 1–10 were merged to `main` in dependency order after ancestry, content, Runtime/coverage, and offline-example gates passed. Generic recovery PR 11 passed the complete GitHub matrix and was merged as `b836d71f42045528023a3d0a9fc2f1a97f5d0796`; its added-line audit contains no workstream, release-pin, fork, campaign, or experiment-specific content. |
 | Independent spec-conformance review is clean. | met | Independent rereview found no blocking findings after 77 focused tests and duplicate identity, timestamp provenance, complete-state, provider-tag-ceiling, quality/security/schema, release-build, and remote-pin checks. |
 | Provide the exact Workstream 2 dependency pin. | met | `qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.2#subdirectory=qiskit-ibm-runtime-mcp-server` |
 
@@ -62,6 +62,9 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
   non-blocking because the tag object, peeled remote ref, resolver, and manifest
   all identify the exact tested commit.
 - No QPU or paid-compute mutation was performed during W1-10.
+- Upstream recovery contribution: PR
+  `https://github.com/abbudjoe/mcp-servers/pull/11`, merged to `main` as
+  `b836d71f42045528023a3d0a9fc2f1a97f5d0796` after every GitHub check passed.
 
 ## Recovery-contract amendment
 
