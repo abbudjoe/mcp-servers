@@ -98,20 +98,97 @@ class CircuitArtifact(VersionedContractModel):
         return self
 
 
+class CalibrationDatum(ContractModel):
+    """One timestamped backend calibration value in its source unit."""
+
+    name: str = Field(min_length=1)
+    value: JsonValue
+    unit: str | None = None
+    timestamp: AwareDatetime | None = None
+
+
+class QubitSnapshot(ContractModel):
+    """Complete properties record for one physical backend qubit."""
+
+    index: NonNegativeInt
+    operational: bool | None
+    parameters: list[CalibrationDatum]
+
+
+class InstructionSnapshot(ContractModel):
+    """One exact instruction/qargs entry from a Qiskit target."""
+
+    name: str = Field(min_length=1)
+    qubits: list[NonNegativeInt] | None
+    error: NonNegativeFloat | None
+    duration: NonNegativeFloat | None
+    operational: bool | None
+    operation_parameters: list[JsonValue]
+    calibration_parameters: list[CalibrationDatum]
+
+
+class FaultyInstruction(ContractModel):
+    """One instruction/qargs tuple reported faulty by backend properties."""
+
+    name: str = Field(min_length=1)
+    qubits: list[NonNegativeInt]
+
+
+class BackendStatusSnapshot(ContractModel):
+    """Backend-wide status observed when the snapshot was retrieved."""
+
+    operational: bool | None
+    pending_jobs: NonNegativeInt | None
+    status_message: str | None
+
+
+class ProcessorMetadata(ContractModel):
+    """Stable processor identity with the provider's source metadata preserved."""
+
+    family: str | None = None
+    revision: str | None = None
+    segment: str | None = None
+    raw: JsonValue | None = None
+
+
+class TargetMetadata(ContractModel):
+    """Backend-wide Qiskit Target structure not repeated per instruction tuple."""
+
+    num_qubits: NonNegativeInt
+    physical_qubits: list[NonNegativeInt]
+    operation_names: list[str]
+    global_operations: list[str]
+    dt: NonNegativeFloat | None
+    granularity: PositiveInt
+    min_length: PositiveInt
+    pulse_alignment: PositiveInt
+    acquire_alignment: PositiveInt
+    concurrent_measurements: list[list[NonNegativeInt]] | None
+
+
 class BackendSnapshot(VersionedContractModel):
-    """Versioned metadata snapshot populated by the snapshot service."""
+    """Complete reproducible backend target and calibration snapshot."""
 
     backend_name: str = Field(min_length=1)
     instance_id: str = Field(min_length=1)
     retrieved_at: AwareDatetime
     properties_at: AwareDatetime | None
+    properties_last_update: AwareDatetime | None
+    properties_available: bool
+    fractional_gate_mode: Literal["disabled", "enabled", "all"]
+    backend_version: str | None
+    processor: ProcessorMetadata
+    backend_status: BackendStatusSnapshot
+    target: TargetMetadata
     target_hash: Sha256Id = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     snapshot_hash: Sha256Id = Field(pattern=r"^sha256:[0-9a-f]{64}$")
-    qubits: list[dict[str, Any]]
-    instructions: list[dict[str, Any]]
+    qubits: list[QubitSnapshot]
+    instructions: list[InstructionSnapshot]
     coupling_edges: list[list[int]]
     faulty_qubits: list[NonNegativeInt]
-    faulty_instructions: list[dict[str, Any]]
+    faulty_instructions: list[FaultyInstruction]
+    general_parameters: list[CalibrationDatum]
+    general_qlists: list[JsonValue]
     software_versions: dict[str, str]
 
     @field_validator("coupling_edges")
@@ -122,6 +199,42 @@ class BackendSnapshot(VersionedContractModel):
                 "each coupling edge must contain exactly two non-negative qubits"
             )
         return value
+
+    @model_validator(mode="after")
+    def _complete_target_contract(self) -> BackendSnapshot:
+        expected_indices = list(range(self.target.num_qubits))
+        if [qubit.index for qubit in self.qubits] != expected_indices:
+            raise ValueError(
+                "qubits must contain every physical index exactly once in order"
+            )
+        if self.target.physical_qubits != expected_indices:
+            raise ValueError(
+                "target.physical_qubits must contain every physical index in order"
+            )
+        instruction_keys = [
+            (
+                instruction.name,
+                None if instruction.qubits is None else tuple(instruction.qubits),
+            )
+            for instruction in self.instructions
+        ]
+        if len(instruction_keys) != len(set(instruction_keys)):
+            raise ValueError("instruction name/qubit tuples must be unique")
+        if any(
+            qubit >= self.target.num_qubits
+            for instruction in self.instructions
+            for qubit in (instruction.qubits or [])
+        ):
+            raise ValueError("instruction qubits must belong to the target")
+        if any(
+            qubit >= self.target.num_qubits
+            for edge in self.coupling_edges
+            for qubit in edge
+        ):
+            raise ValueError("coupling edge qubits must belong to the target")
+        if any(qubit >= self.target.num_qubits for qubit in self.faulty_qubits):
+            raise ValueError("faulty qubits must belong to the target")
+        return self
 
 
 class PauliObservables(VersionedContractModel):

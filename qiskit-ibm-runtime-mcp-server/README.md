@@ -244,6 +244,21 @@ Get detailed properties of specific backend.
 - Current operational status
 - Queue information
 
+#### `get_backend_snapshot(backend_name, properties_at=None, fractional_gate_mode="disabled", ...)`
+Get a complete, versioned backend target and calibration snapshot for reproducible
+layout selection and later reconstruction. The backend name and configured Runtime
+instance are always explicit; this API never selects a backend or submits a job.
+
+**Parameters:**
+- `backend_name`: Exact backend name.
+- `properties_at` (optional): Timezone-aware timestamp for historical properties.
+- `fractional_gate_mode`: `disabled`, `enabled`, or `all`. Enabled fractional gates
+  are rejected with dynamic circuits, PEC, PEA, or gate twirling.
+
+**Returns:** Every physical qubit and every target instruction/qubit tuple, including
+available errors, durations, parameters, operational flags, faults, coupling,
+timestamps, backend/processor/software provenance, and stable target/snapshot hashes.
+
 #### `get_coupling_map(backend_name: str)`
 Get the coupling map (qubit connectivity) for a backend with detailed analysis.
 
@@ -269,7 +284,7 @@ Get calibration data for a backend including T1, T2 coherence times and error ra
 
 **Parameters:**
 - `backend_name`: Name of the backend (e.g., `ibm_brisbane`)
-- `qubit_indices` (optional): List of specific qubit indices. If not provided, returns data for the first 10 qubits.
+- `qubit_indices` (optional): List of specific qubit indices. If not provided, returns data for every backend qubit.
 
 **Returns:** Calibration data including:
 - T1 and T2 coherence times (in microseconds)

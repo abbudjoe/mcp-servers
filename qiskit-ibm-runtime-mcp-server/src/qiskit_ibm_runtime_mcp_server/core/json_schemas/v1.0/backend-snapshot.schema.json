@@ -1,13 +1,421 @@
 {
+  "$defs": {
+    "BackendStatusSnapshot": {
+      "additionalProperties": true,
+      "description": "Backend-wide status observed when the snapshot was retrieved.",
+      "properties": {
+        "operational": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Operational"
+        },
+        "pending_jobs": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Pending Jobs"
+        },
+        "status_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Status Message"
+        }
+      },
+      "required": [
+        "operational",
+        "pending_jobs",
+        "status_message"
+      ],
+      "title": "BackendStatusSnapshot",
+      "type": "object"
+    },
+    "CalibrationDatum": {
+      "additionalProperties": true,
+      "description": "One timestamped backend calibration value in its source unit.",
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timestamp"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "title": "CalibrationDatum",
+      "type": "object"
+    },
+    "FaultyInstruction": {
+      "additionalProperties": true,
+      "description": "One instruction/qargs tuple reported faulty by backend properties.",
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "qubits": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Qubits",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "qubits"
+      ],
+      "title": "FaultyInstruction",
+      "type": "object"
+    },
+    "InstructionSnapshot": {
+      "additionalProperties": true,
+      "description": "One exact instruction/qargs entry from a Qiskit target.",
+      "properties": {
+        "calibration_parameters": {
+          "items": {
+            "$ref": "#/$defs/CalibrationDatum"
+          },
+          "title": "Calibration Parameters",
+          "type": "array"
+        },
+        "duration": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Duration"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Error"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "operation_parameters": {
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Operation Parameters",
+          "type": "array"
+        },
+        "operational": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Operational"
+        },
+        "qubits": {
+          "anyOf": [
+            {
+              "items": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Qubits"
+        }
+      },
+      "required": [
+        "name",
+        "qubits",
+        "error",
+        "duration",
+        "operational",
+        "operation_parameters",
+        "calibration_parameters"
+      ],
+      "title": "InstructionSnapshot",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "ProcessorMetadata": {
+      "additionalProperties": true,
+      "description": "Stable processor identity with the provider's source metadata preserved.",
+      "properties": {
+        "family": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Family"
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JsonValue"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        },
+        "segment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Segment"
+        }
+      },
+      "title": "ProcessorMetadata",
+      "type": "object"
+    },
+    "QubitSnapshot": {
+      "additionalProperties": true,
+      "description": "Complete properties record for one physical backend qubit.",
+      "properties": {
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "operational": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Operational"
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/CalibrationDatum"
+          },
+          "title": "Parameters",
+          "type": "array"
+        }
+      },
+      "required": [
+        "index",
+        "operational",
+        "parameters"
+      ],
+      "title": "QubitSnapshot",
+      "type": "object"
+    },
+    "TargetMetadata": {
+      "additionalProperties": true,
+      "description": "Backend-wide Qiskit Target structure not repeated per instruction tuple.",
+      "properties": {
+        "acquire_alignment": {
+          "exclusiveMinimum": 0,
+          "title": "Acquire Alignment",
+          "type": "integer"
+        },
+        "concurrent_measurements": {
+          "anyOf": [
+            {
+              "items": {
+                "items": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Concurrent Measurements"
+        },
+        "dt": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Dt"
+        },
+        "global_operations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Global Operations",
+          "type": "array"
+        },
+        "granularity": {
+          "exclusiveMinimum": 0,
+          "title": "Granularity",
+          "type": "integer"
+        },
+        "min_length": {
+          "exclusiveMinimum": 0,
+          "title": "Min Length",
+          "type": "integer"
+        },
+        "num_qubits": {
+          "minimum": 0,
+          "title": "Num Qubits",
+          "type": "integer"
+        },
+        "operation_names": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Operation Names",
+          "type": "array"
+        },
+        "physical_qubits": {
+          "items": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "title": "Physical Qubits",
+          "type": "array"
+        },
+        "pulse_alignment": {
+          "exclusiveMinimum": 0,
+          "title": "Pulse Alignment",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "num_qubits",
+        "physical_qubits",
+        "operation_names",
+        "global_operations",
+        "dt",
+        "granularity",
+        "min_length",
+        "pulse_alignment",
+        "acquire_alignment",
+        "concurrent_measurements"
+      ],
+      "title": "TargetMetadata",
+      "type": "object"
+    }
+  },
   "$id": "https://qiskit.org/schemas/runtime-contracts/v1.0/backend-snapshot.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": true,
-  "description": "Versioned metadata snapshot populated by the snapshot service.",
+  "description": "Complete reproducible backend target and calibration snapshot.",
   "properties": {
     "backend_name": {
       "minLength": 1,
       "title": "Backend Name",
       "type": "string"
+    },
+    "backend_status": {
+      "$ref": "#/$defs/BackendStatusSnapshot"
+    },
+    "backend_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Backend Version"
     },
     "coupling_edges": {
       "items": {
@@ -21,8 +429,7 @@
     },
     "faulty_instructions": {
       "items": {
-        "additionalProperties": true,
-        "type": "object"
+        "$ref": "#/$defs/FaultyInstruction"
       },
       "title": "Faulty Instructions",
       "type": "array"
@@ -35,6 +442,29 @@
       "title": "Faulty Qubits",
       "type": "array"
     },
+    "fractional_gate_mode": {
+      "enum": [
+        "disabled",
+        "enabled",
+        "all"
+      ],
+      "title": "Fractional Gate Mode",
+      "type": "string"
+    },
+    "general_parameters": {
+      "items": {
+        "$ref": "#/$defs/CalibrationDatum"
+      },
+      "title": "General Parameters",
+      "type": "array"
+    },
+    "general_qlists": {
+      "items": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "General Qlists",
+      "type": "array"
+    },
     "instance_id": {
       "minLength": 1,
       "title": "Instance Id",
@@ -42,11 +472,13 @@
     },
     "instructions": {
       "items": {
-        "additionalProperties": true,
-        "type": "object"
+        "$ref": "#/$defs/InstructionSnapshot"
       },
       "title": "Instructions",
       "type": "array"
+    },
+    "processor": {
+      "$ref": "#/$defs/ProcessorMetadata"
     },
     "properties_at": {
       "anyOf": [
@@ -60,10 +492,25 @@
       ],
       "title": "Properties At"
     },
+    "properties_available": {
+      "title": "Properties Available",
+      "type": "boolean"
+    },
+    "properties_last_update": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Properties Last Update"
+    },
     "qubits": {
       "items": {
-        "additionalProperties": true,
-        "type": "object"
+        "$ref": "#/$defs/QubitSnapshot"
       },
       "title": "Qubits",
       "type": "array"
@@ -90,6 +537,9 @@
       "title": "Software Versions",
       "type": "object"
     },
+    "target": {
+      "$ref": "#/$defs/TargetMetadata"
+    },
     "target_hash": {
       "pattern": "^sha256:[0-9a-f]{64}$",
       "title": "Target Hash",
@@ -102,6 +552,13 @@
     "instance_id",
     "retrieved_at",
     "properties_at",
+    "properties_last_update",
+    "properties_available",
+    "fractional_gate_mode",
+    "backend_version",
+    "processor",
+    "backend_status",
+    "target",
     "target_hash",
     "snapshot_hash",
     "qubits",
@@ -109,6 +566,8 @@
     "coupling_edges",
     "faulty_qubits",
     "faulty_instructions",
+    "general_parameters",
+    "general_qlists",
     "software_versions"
   ],
   "title": "BackendSnapshot",
