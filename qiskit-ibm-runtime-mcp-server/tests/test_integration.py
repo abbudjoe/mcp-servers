@@ -35,13 +35,17 @@ class TestMCPServerIntegration:
         assert mcp.instructions is not None
         assert isinstance(mcp.instructions, str)
         assert len(mcp.instructions) > 0
-        # Verify instructions mention key workflow concepts
+        # Verify instructions expose the safe control plane, not a dead-end stub.
         assert "QISKIT_IBM_RUNTIME_MCP_INSTANCE" in mcp.instructions
         assert "never accepted by tools" in mcp.instructions
         assert "run_sampler_tool" in mcp.instructions
         assert "run_estimator_tool" in mcp.instructions
+        assert "submission is disabled" in mcp.instructions
+        assert "ApprovalReceipt" in mcp.instructions
+        assert "ApprovedBatchExecutor" in mcp.instructions
         assert "get_job_results_tool" in mcp.instructions
         assert "circuits://" in mcp.instructions
+        assert "Use run_sampler_tool for" not in mcp.instructions
 
     @pytest.mark.asyncio
     async def test_service_initialization_flow(

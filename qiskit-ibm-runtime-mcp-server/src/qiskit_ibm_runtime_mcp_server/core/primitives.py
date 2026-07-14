@@ -38,7 +38,7 @@ from .models import (
     SamplerRegisterResult,
     ShapedResultValue,
 )
-from .serialization import to_json_safe
+from .serialization import execution_spans_to_json, to_json_safe
 
 
 PrimitiveKind = Literal["sampler", "estimator"]
@@ -252,45 +252,22 @@ def _metadata_json(
     threshold_bytes: int,
 ) -> Any:
     """Preserve Runtime metadata while artifact-backing large span masks."""
-    if isinstance(value, ExecutionSpans):
-        return {
-            "$runtime_type": "ExecutionSpans",
-            "start": to_json_safe(value.start),
-            "stop": to_json_safe(value.stop),
-            "duration": to_json_safe(value.duration),
-            "pub_idxs": to_json_safe(value.pub_idxs),
-            "spans": [
-                _metadata_json(
-                    span,
-                    sink=sink,
-                    threshold_bytes=threshold_bytes,
-                )
-                for span in value
-            ],
-        }
-    if isinstance(value, ExecutionSpan):
-        masks: dict[str, Any] = {}
-        for pub_idx in value.pub_idxs:
+    if isinstance(value, (ExecutionSpans, ExecutionSpan)):
+
+        def encode_mask(mask: Any, pub_idx: int) -> Any:
             wrapped = _artifact_value(
-                value.mask(pub_idx),
+                mask,
                 sink=sink,
                 threshold_bytes=threshold_bytes,
                 kind=f"runtime-execution-span-mask:{pub_idx}",
             )
-            masks[str(pub_idx)] = (
+            return (
                 wrapped.value
                 if isinstance(wrapped, InlineJsonValue)
                 else wrapped.model_dump(mode="json")
             )
-        return {
-            "$runtime_type": type(value).__name__,
-            "start": to_json_safe(value.start),
-            "stop": to_json_safe(value.stop),
-            "duration": to_json_safe(value.duration),
-            "size": to_json_safe(value.size),
-            "pub_idxs": to_json_safe(value.pub_idxs),
-            "masks": masks,
-        }
+
+        return execution_spans_to_json(value, encode_mask=encode_mask)
     if isinstance(value, Mapping):
         converted: dict[str, Any] = {}
         for key, item in value.items():

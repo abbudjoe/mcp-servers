@@ -770,6 +770,17 @@ def test_canonical_json_preserves_runtime_execution_spans() -> None:
     }
 
 
+def test_empty_runtime_execution_spans_have_a_stable_json_contract() -> None:
+    assert json.loads(canonical_json(ExecutionSpans([]))) == {
+        "$runtime_type": "ExecutionSpans",
+        "start": None,
+        "stop": None,
+        "duration": 0.0,
+        "pub_idxs": [],
+        "spans": [],
+    }
+
+
 def test_observable_forms_cannot_be_ambiguously_interchanged() -> None:
     with pytest.raises(ValidationError):
         EstimatorPubSpec(

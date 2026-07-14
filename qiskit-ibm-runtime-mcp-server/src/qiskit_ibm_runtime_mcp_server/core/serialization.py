@@ -20,6 +20,7 @@ import math
 from collections.abc import Mapping
 from datetime import date, datetime, timezone
 from enum import Enum
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -29,6 +30,48 @@ from qiskit_ibm_runtime.execution_span import ExecutionSpan, ExecutionSpans
 
 class JsonConversionError(TypeError):
     """Raised when a value has no lossless, deterministic JSON representation."""
+
+
+def execution_spans_to_json(
+    value: ExecutionSpans | ExecutionSpan,
+    *,
+    encode_mask: Callable[[Any, int], JsonValue] | None = None,
+) -> JsonValue:
+    """Serialize Runtime spans once, with a caller-owned mask storage policy."""
+    mask_encoder = encode_mask or (lambda mask, _pub_idx: to_json_safe(mask))
+    if isinstance(value, ExecutionSpans):
+        if len(value) == 0:
+            return {
+                "$runtime_type": "ExecutionSpans",
+                "start": None,
+                "stop": None,
+                "duration": 0.0,
+                "pub_idxs": [],
+                "spans": [],
+            }
+        return {
+            "$runtime_type": "ExecutionSpans",
+            "start": to_json_safe(value.start),
+            "stop": to_json_safe(value.stop),
+            "duration": to_json_safe(value.duration),
+            "pub_idxs": to_json_safe(value.pub_idxs),
+            "spans": [
+                execution_spans_to_json(span, encode_mask=mask_encoder)
+                for span in value
+            ],
+        }
+    return {
+        "$runtime_type": type(value).__name__,
+        "start": to_json_safe(value.start),
+        "stop": to_json_safe(value.stop),
+        "duration": to_json_safe(value.duration),
+        "size": to_json_safe(value.size),
+        "pub_idxs": to_json_safe(value.pub_idxs),
+        "masks": {
+            str(pub_idx): mask_encoder(value.mask(pub_idx), pub_idx)
+            for pub_idx in value.pub_idxs
+        },
+    }
 
 
 def _datetime_to_json(value: datetime) -> str:
@@ -78,28 +121,8 @@ def to_json_safe(value: Any) -> JsonValue:
         if np.isnat(value):
             raise JsonConversionError("NumPy NaT is not valid canonical JSON")
         return str(np.datetime_as_string(value, unit="ns", timezone="UTC"))
-    if isinstance(value, ExecutionSpans):
-        return {
-            "$runtime_type": "ExecutionSpans",
-            "start": to_json_safe(value.start),
-            "stop": to_json_safe(value.stop),
-            "duration": to_json_safe(value.duration),
-            "pub_idxs": to_json_safe(value.pub_idxs),
-            "spans": [to_json_safe(span) for span in value],
-        }
-    if isinstance(value, ExecutionSpan):
-        return {
-            "$runtime_type": type(value).__name__,
-            "start": to_json_safe(value.start),
-            "stop": to_json_safe(value.stop),
-            "duration": to_json_safe(value.duration),
-            "size": to_json_safe(value.size),
-            "pub_idxs": to_json_safe(value.pub_idxs),
-            "masks": {
-                str(pub_idx): to_json_safe(value.mask(pub_idx))
-                for pub_idx in value.pub_idxs
-            },
-        }
+    if isinstance(value, (ExecutionSpans, ExecutionSpan)):
+        return execution_spans_to_json(value)
     if isinstance(value, np.generic):
         raise JsonConversionError(
             f"NumPy {value.dtype} has no supported JSON representation"

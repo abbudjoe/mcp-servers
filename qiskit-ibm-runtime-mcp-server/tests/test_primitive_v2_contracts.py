@@ -44,6 +44,7 @@ from qiskit_ibm_runtime_mcp_server.core import (
     PrimitiveContractError,
     SamplerPubSpec,
     SparsePauliHamiltonian,
+    canonical_json,
     ingest_circuit,
     parse_primitive_result,
     prepare_estimator_pubs,
@@ -413,6 +414,32 @@ def test_large_execution_span_masks_use_artifact_sink(tmp_path: Path) -> None:
         [False, True, True],
         [False, True, True],
     ]
+
+
+def test_empty_execution_spans_match_canonical_metadata_contract(
+    tmp_path: Path,
+) -> None:
+    sink = LocalArtifactCAS(tmp_path / "cas")
+    result = _sampler_result_fixture()
+    result_with_spans = PrimitiveResult(
+        list(result),
+        metadata={"execution_spans": ExecutionSpans([])},
+    )
+
+    envelope = parse_primitive_result(
+        result_with_spans,
+        primitive="sampler",
+        pub_ids=["s-scalar", "s-vector", "s-matrix"],
+        expected_pub_shapes=[[], [2], [2, 2]],
+        job_id="job-empty-spans",
+        backend_name="ibm_fixture",
+        sink=sink,
+        threshold_bytes=0,
+    )
+
+    assert envelope.job_metadata["execution_spans"] == json.loads(
+        canonical_json(ExecutionSpans([]))
+    )
 
 
 def test_result_cardinality_and_shape_mismatches_fail_closed(tmp_path: Path) -> None:

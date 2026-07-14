@@ -57,6 +57,21 @@ async def test_research_tool_schemas_have_no_secret_arguments() -> None:
         assert argument_names.isdisjoint(forbidden), tool.name
 
 
+@pytest.mark.asyncio
+async def test_legacy_submission_tools_advertise_the_disabled_approval_path() -> None:
+    """FastMCP descriptions must not promise submission through disabled stubs."""
+    tools = {tool.name: tool for tool in await mcp.list_tools()}
+
+    for name in ("run_sampler_tool", "run_estimator_tool"):
+        description = tools[name].description or ""
+        assert "without submitting" in description
+        assert "deprecated compatibility stub" in description
+        assert "ApprovalReceipt" in description
+        assert "ApprovedBatchExecutor" in description
+        assert "Jobs run asynchronously" not in description
+        assert "Job submission status" not in description
+
+
 def test_no_admin_or_account_mutation_profile_is_available() -> None:
     """Administrative credential operations are intentionally not shipped."""
     assert {profile.value for profile in ToolProfile} == {"research"}

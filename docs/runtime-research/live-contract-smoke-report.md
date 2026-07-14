@@ -111,8 +111,10 @@ Private evidence root:
    the complete public span timing, PUB indices, types, sizes, ordering, and
    dependency masks; the completed provider result was then parsed without a
    new QPU submission.
-4. Execution-span masks are materialized inline. That is bounded for this tiny
-   smoke; larger production workloads may require artifact-backed mask storage.
+4. The live RC materialized execution-span masks inline. Release hardening commit
+   `d6de645` resolved this finding: masks now honor the configured artifact
+   threshold while span timing, PUB indices, ordering, types, and sizes remain
+   visible in metadata.
 5. The configured documentation-server test suite deselected three integration
    cases. All 921 selected preflight outcomes completed with zero failures or
    errors; the post-live Runtime suite completed with 357 passed and one skip.

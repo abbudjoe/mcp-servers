@@ -42,12 +42,17 @@ from qiskit_ibm_runtime_mcp_server.ibm_runtime import (
     run_sampler,
     usage_info,
 )
-from qiskit_ibm_runtime_mcp_server.server import mcp
 from qiskit_ibm_runtime_mcp_server.server import (
     active_account_info_tool,
     active_instance_info_tool,
     available_instances_tool,
+    get_bell_state_resource,
+    get_ghz_state_resource,
+    get_random_circuit_resource,
+    get_superposition_resource,
     list_saved_accounts_tool,
+    mcp,
+    run_bell_state,
     usage_info_tool,
 )
 
@@ -1420,7 +1425,7 @@ class TestExampleCircuits:
         assert "measure" in circuit
 
     def test_all_circuits_have_usage_instructions(self):
-        """Test all example circuits include usage instructions."""
+        """Circuit payloads must direct callers to the approved control plane."""
         circuits = [
             get_bell_state_circuit(),
             get_ghz_state_circuit(),
@@ -1431,6 +1436,28 @@ class TestExampleCircuits:
         for circuit in circuits:
             assert "usage" in circuit
             assert "run_sampler_tool" in circuit["usage"]
+            assert "disabled" in circuit["usage"]
+            assert "bounded plan and approval" in circuit["usage"]
+            assert "Pass the 'circuit' field directly" not in circuit["usage"]
+
+    def test_prompt_and_resources_never_recommend_disabled_submission(self):
+        """Prompt/resource surfaces must preserve the same submission contract."""
+        prompt = run_bell_state("ibm_test")
+        resources = [
+            get_bell_state_resource(),
+            get_ghz_state_resource(),
+            get_random_circuit_resource(),
+            get_superposition_resource(),
+        ]
+
+        assert "run_sampler_tool is disabled" in prompt
+        assert "ApprovalReceipt" in prompt
+        assert "ApprovedBatchExecutor" in prompt
+        assert "Call run_sampler_tool" not in prompt
+        for resource in resources:
+            assert "disabled" in resource["usage"]
+            assert "plan and approval" in resource["usage"]
+            assert "Pass the 'circuit' field directly" not in resource["usage"]
 
 
 class TestServerRegistration:

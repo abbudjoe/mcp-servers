@@ -235,8 +235,8 @@ The agent has access to these tools provided by the MCP server:
 | `get_coupling_map_tool` | Get qubit connectivity map for a backend |
 | `find_optimal_qubit_chains_tool` | Find optimal linear qubit chains based on calibration data |
 | `find_optimal_qv_qubits_tool` | Find optimal qubit subgraphs for Quantum Volume experiments |
-| `run_estimator_tool` | Run a circuit with EstimatorV2 (compute expectation values) |
-| `run_sampler_tool` | Run a circuit with SamplerV2 (measurement sampling) |
+| `run_estimator_tool` | Deprecated non-submitting compatibility stub; returns an approval-path error |
+| `run_sampler_tool` | Deprecated non-submitting compatibility stub; returns an approval-path error |
 | `list_my_jobs_tool` | List user's recent quantum jobs |
 | `get_job_status_tool` | Get status of a specific job |
 | `get_job_results_tool` | Retrieve results from a completed job |

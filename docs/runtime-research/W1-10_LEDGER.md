@@ -20,7 +20,7 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 - Target contract: an immutable, clean-installable Runtime wrapper release with
   versioned schemas, an exact Workstream 2 dependency pin, and a generic,
   dependency-ordered upstream contribution series
-- Status: `in-progress`
+- Status: `review-failed`
 - Live-compute policy: no QPU submission or paid-compute mutation is authorized
   or required for this workstream
 
