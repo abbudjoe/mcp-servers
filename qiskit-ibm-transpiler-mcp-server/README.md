@@ -15,9 +15,10 @@ MCP server for Qiskit transpiler. It supports **AI routing**,
 
 ## Prerequisites
 
-- python>=3.10 and <3.14
-- qiskit-ibm-transpiler==0.15.0
-- fastmcp>=2.12.4
+- Python `>=3.10,<3.14`
+- Qiskit `>=2.1,<2.5`
+- Qiskit IBM Transpiler `>=0.18,<0.19`
+- FastMCP `>=3.2,<3.5`
 
 ## Installation
 
@@ -53,7 +54,7 @@ uv run qiskit-ibm-transpiler-mcp-server
 The server will start and listen for MCP connections.
 
 
-### Sync Usage (Scripts, Jupyter)
+### Sync Usage (Scripts and synchronous frameworks)
 
 For frameworks that don't support async operations:
 
@@ -75,7 +76,7 @@ qasm_string = "your_qasm_circuit_here"
 # Will use saved credentials or environment variable if token not provided
 setup_ibm_quantum_account.sync()
 
-# Works in Jupyter notebooks
+# In Jupyter or another active event loop, call these functions with await.
 # 3. AI Clifford Synthesis
 
 # 3.1 AI Routing [Optional]

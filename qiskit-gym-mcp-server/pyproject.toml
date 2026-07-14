@@ -6,13 +6,12 @@ readme = "README.md"
 requires-python = ">=3.10,<3.14"
 
 dependencies = [
-    "fastmcp>=3.2.0,<4",
-    "qiskit-gym>=0.3.0",
-    "qiskit>=1.3.0",
-    "nest-asyncio>=1.5.0",
-    "qiskit-mcp-server",
+    "fastmcp>=3.2.0,<3.5",
+    "qiskit-gym>=0.4.0,<0.5",
+    "qiskit>=2.1.0,<2.6",
+    "qiskit-mcp-server>=0.3.0,<0.4",
     "pydantic>=2.0.0",
-    "qiskit-ibm-runtime>=0.34.0",  # For fake backends (exact IBM topologies without credentials)
+    "qiskit-ibm-runtime>=0.40.1,<0.46",  # For fake backends (exact IBM topologies without credentials)
 ]
 
 [tool.uv.sources]
