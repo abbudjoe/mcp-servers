@@ -15,10 +15,8 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 - Distribution: `qiskit-ibm-runtime-mcp-server`
 - Version: `0.7.3`
 - Tag: `runtime-research-v0.7.3`
-- Annotated tag object: pending publication audit
-- Tested/peeled commit: the exact object resolved by
-  `runtime-research-v0.7.3^{}`; the post-publication audit records its expanded
-  object ID in this manifest on the release branch
+- Annotated tag object: `66a9b66ac91e0031ba51e5576f28a6bd7410862a`
+- Tested/peeled commit: `19dfc32862f99002e12bd6de824e5967c5227a85`
 - Remote: `https://github.com/abbudjoe/mcp-servers.git`
 - GitHub Release:
   `https://github.com/abbudjoe/mcp-servers/releases/tag/runtime-research-v0.7.3`
@@ -29,12 +27,12 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.3#subdirectory=qiskit-ibm-runtime-mcp-server
 ```
 
-After publication, an isolated CPython 3.12 installation from this exact
-requirement must resolve to the tagged commit and pass the installed-package
-probe for version `0.7.3`, 37 generated/packaged schemas,
-`RecoveredJobReceipt`, `SubmissionRecovery`, and the stable snapshot-identity
-regression. Pre-publication wheel and sdist clean-install probes already pass;
-the exact remote-pin probe remains pending until the tag exists.
+An isolated CPython 3.12 installation from this exact public requirement
+resolved to commit `19dfc32862f99002e12bd6de824e5967c5227a85` and passed the
+installed-package probe for version `0.7.3`, 37 generated/packaged schemas,
+`RecoveredJobReceipt`, `SubmissionRecovery`, status-insensitive snapshot
+identity, and calibration-sensitive identity. The downloaded GitHub Release
+assets matched the preregistered wheel and sdist hashes below.
 
 ## Evidence hashes
 

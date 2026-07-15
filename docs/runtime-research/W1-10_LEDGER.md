@@ -29,38 +29,38 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 | DoD item | Status | Planned evidence |
 |---|---|---|
 | Resolve every W1-09 smoke finding. | met | Provider tag limit and ordered-submit failures were fixed before W1-09; live `ExecutionSpans` serialization is covered; release commit `d6de645` adds threshold-backed masks. Focused release smoke: 44 passed; plan/security/result smoke: 74 passed. The three docs integration cases remain an explicit read-only network gate, not ordinary tokenless CI. |
-| Run clean-install, package-build, full CI, security, and schema-compatibility gates. | met | Runtime 0.7.2 passed on Python 3.10–3.14 (405 passed, 1 skipped per interpreter) with enforced per-module branch coverage: approvals 100%, budgeting 91.07%, parsing 90.91%, secret handling 100%. Reproducible wheel/sdist builds and isolated installs passed. Canonical lock/schema gates, qiskit/docs/transpiler/gym suites, Ruff, format, strict mypy, and Bandit passed. |
-| Update version, changelog, migration guide, README, API docs, and generic examples. | met | Runtime 0.7.2, meta-package 0.12.2, `CHANGELOG.md`, `MIGRATION.md`, Runtime README, `docs/API.md`, experiment compatibility contract, and offline generic examples are synchronized with all 37 schemas. |
-| Tag the exact tested commit and record lock/package hashes. | met | Annotated tag `runtime-research-v0.7.2` has tag object `0182e8b254b7e357b3738161d0cd9a6a720d3f01` and peels to tested commit `de40ebfcc28946c6424e6d54a8399aac111b2daa`; the annotation and release manifest record the lock, wheel, and sdist hashes. |
-| Make the pinned release accessible to Workstream 2. | met | The immutable tag and formal GitHub Release are published at `https://github.com/abbudjoe/mcp-servers`; an isolated Python 3.12 install from the exact tag resolved to the tested commit and verified package `0.7.2`, all 37 schemas, and the typed recovery models. |
+| Run clean-install, package-build, full CI, security, and schema-compatibility gates. | met | Runtime 0.7.3 passed on Python 3.10–3.14 (408 passed, 1 skipped per interpreter) with enforced per-module branch coverage: approvals 100%, budgeting 91.07%, parsing 90.91%, secret handling 100%. Reproducible wheel/sdist builds and isolated installs passed. Canonical lock/schema gates, qiskit/docs/transpiler/gym suites, Ruff, format, strict mypy, and Bandit passed. |
+| Update version, changelog, migration guide, README, API docs, and generic examples. | met | Runtime 0.7.3, meta-package 0.12.3, `CHANGELOG.md`, `MIGRATION.md`, Runtime README, `docs/API.md`, experiment compatibility contract, and offline generic examples are synchronized with all 37 schemas. |
+| Tag the exact tested commit and record lock/package hashes. | met | Annotated tag `runtime-research-v0.7.3` has tag object `66a9b66ac91e0031ba51e5576f28a6bd7410862a` and peels to tested commit `19dfc32862f99002e12bd6de824e5967c5227a85`; the annotation and release manifest record the lock, wheel, and sdist hashes. |
+| Make the pinned release accessible to Workstream 2. | met | The immutable 0.7.3 tag and formal GitHub Release are published at `https://github.com/abbudjoe/mcp-servers`; an isolated Python 3.12 install from the exact public tag resolved to the tested commit and verified package `0.7.3`, all 37 schemas, typed recovery, and corrected snapshot identity. |
 | Publish an experiment compatibility document. | met | `qiskit-ibm-runtime-mcp-server/docs/EXPERIMENT_COMPATIBILITY.md` records import paths, Python/stack requirements, environment variables, schema versions, modes, recovery trust boundary and limitations, exact tag pin, and W1-09 usage. |
 | Split upstreamable changes into dependency-ordered PRs without experiment-specific content. | met | PRs 1–10 were merged to `main` in dependency order after ancestry, content, Runtime/coverage, and offline-example gates passed. Generic recovery PR 11 passed the complete GitHub matrix and was merged as `b836d71f42045528023a3d0a9fc2f1a97f5d0796`; its added-line audit contains no workstream, release-pin, fork, campaign, or experiment-specific content. |
 | Independent spec-conformance review is clean. | met | Independent rereview found no blocking findings after 77 focused tests and duplicate identity, timestamp provenance, complete-state, provider-tag-ceiling, quality/security/schema, release-build, and remote-pin checks. |
-| Provide the exact Workstream 2 dependency pin. | met | `qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.2#subdirectory=qiskit-ibm-runtime-mcp-server` |
+| Provide the exact Workstream 2 dependency pin. | met | `qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.3#subdirectory=qiskit-ibm-runtime-mcp-server` |
 
 ## Gate evidence
 
 - Exact tested release commit:
-  `de40ebfcc28946c6424e6d54a8399aac111b2daa`.
-- Annotated tag object: `0182e8b254b7e357b3738161d0cd9a6a720d3f01`;
+  `19dfc32862f99002e12bd6de824e5967c5227a85`.
+- Annotated tag object: `66a9b66ac91e0031ba51e5576f28a6bd7410862a`;
   peeled tag target: the exact tested release commit above.
 - Canonical compatibility: 7 passed on CPython 3.12.12; `uv lock --check`
   and `shasum -a 256 -c uv.lock.sha256` passed.
-- Runtime canonical suite: 405 passed, 1 skipped. The skip is the explicitly
+- Runtime canonical suite: 408 passed, 1 skipped. The skip is the explicitly
   gated read-only historical-provider integration case.
 - Other canonical suites: qiskit 103 passed; docs 173 passed with 3 read-only
   network integrations deselected; transpiler 139 passed with 52 integrations
   deselected; gym 97 passed.
 - Reproducible package builds and isolated wheel/sdist installs passed. The wheel
-  contained version `0.7.2`, the license, and all 37 schemas; the sdist contained the
+  contained version `0.7.3`, the license, and all 37 schemas; the sdist contained the
   changelog, migration guide, API reference, and experiment compatibility
   contract.
-- Remote tag install gate: `REMOTE_PIN_INSTALL_OK 0.7.2 37
-  de40ebfcc28946c6424e6d54a8399aac111b2daa`.
-- Independent assembly rereview: clean, with all nine W1-10 DoD rows
-  classified `met`; the immutable annotation's expanded-SHA typo was classified
-  non-blocking because the tag object, peeled remote ref, resolver, and manifest
-  all identify the exact tested commit.
+- Remote tag install gate: `REMOTE_PIN_AUDIT_OK 0.7.3 37
+  19dfc32862f99002e12bd6de824e5967c5227a85`.
+- Independent release-candidate rereview was clean before publication. The
+  post-publication review verified the tag, peeled commit, release assets,
+  exact public install, schemas, typed recovery, and corrected snapshot
+  identity; its sole ledger-pin conflict was corrected before final rereview.
 - No QPU or paid-compute mutation was performed during W1-10.
 - Upstream recovery contribution: PR
   `https://github.com/abbudjoe/mcp-servers/pull/11`, merged to `main` as
@@ -102,8 +102,8 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 
 ## Stable snapshot-identity amendment
 
-- Status: `in-progress`; the local contract amendment passed, and immutable
-  patch-release 0.7.3 is now under assembly.
+- Status: `met`; immutable patch-release 0.7.3 is published and its exact
+  public dependency pin passed the post-publication install audit.
 - Live finding: W2-09 plan
   `sha256:ad3854dab33ff40ac61bef12949e37b24a20ec78bb8ca716c42df9604810eaf9`
   stopped before submission because `backend_status.pending_jobs` changed from
@@ -154,9 +154,19 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
   no schema/model change or status-evidence loss, and 0.7.2 compatibility
   handling is explicit. Post-review source-contract smoke: 142 passed, one
   gated skip; Ruff, format, and diff checks passed.
-- Release boundary: source and registry metadata now identify candidate 0.7.3.
-  Publication remains blocked until the complete release matrix, reproducible
-  builds, clean installs, exact candidate review, commit, and annotated-tag
-  audit pass. Existing 0.7.2 plans and receipts remain stale.
-- No provider, network, primitive, cloud, or QPU mutation is authorized or
-  required for this amendment.
+- Publication evidence: annotated tag object
+  `66a9b66ac91e0031ba51e5576f28a6bd7410862a` peels locally and remotely to
+  tested commit `19dfc32862f99002e12bd6de824e5967c5227a85`; the formal
+  GitHub Release is
+  `https://github.com/abbudjoe/mcp-servers/releases/tag/runtime-research-v0.7.3`.
+  An isolated public-tag install returned `REMOTE_PIN_AUDIT_OK 0.7.3 37
+  19dfc32862f99002e12bd6de824e5967c5227a85`, and downloaded release assets
+  matched the recorded wheel and sdist SHA-256 values.
+- Exact W2 dependency pin:
+  `qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.3#subdirectory=qiskit-ibm-runtime-mcp-server`.
+  Existing 0.7.2 plans, snapshots, approvals, and receipts remain stale and
+  must not be reused with 0.7.3.
+- No provider, primitive, cloud, or QPU mutation was performed for this
+  amendment. Actual QPU usage was zero seconds and primitive submissions were
+  zero; network access was limited to Git/GitHub publication and public-pin
+  installation verification.
