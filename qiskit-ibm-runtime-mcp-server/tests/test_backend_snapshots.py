@@ -160,6 +160,32 @@ def test_snapshot_and_target_hashes_are_stable_and_content_sensitive() -> None:
     assert snapshot_content_hash(changed) != first.snapshot_hash
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("operational", False),
+        ("pending_jobs", 17),
+        ("status_message", "maintenance window"),
+    ],
+)
+def test_snapshot_hash_excludes_volatile_backend_status(
+    field: str, value: bool | int | str
+) -> None:
+    backend = FakeAthensV2()
+    snapshot = build_backend_snapshot(
+        backend,
+        instance_id="offline:fake-provider",
+        properties=backend.properties(),
+        retrieved_at=NOW,
+    )
+    changed = snapshot.model_copy(deep=True)
+    setattr(changed.backend_status, field, value)
+
+    assert changed.backend_status != snapshot.backend_status
+    assert changed.model_dump(mode="python") != snapshot.model_dump(mode="python")
+    assert snapshot_content_hash(changed) == snapshot.snapshot_hash
+
+
 def test_faulty_qubit_forces_every_touching_instruction_non_operational() -> None:
     backend = FakeAthensV2()
     current_properties = backend.properties()

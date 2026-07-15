@@ -13,6 +13,24 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 All notable changes to `qiskit-ibm-runtime-mcp-server` are documented here.
 Package versions and JSON wire-schema versions are independent.
 
+## 0.7.3 — 2026-07-15
+
+### Fixed
+
+- Excluded the complete typed backend-status observation from
+  `snapshot_content_hash`. Queue depth, availability, and status text remain in
+  every serialized `BackendSnapshot`, but no longer invalidate unchanged target
+  and calibration identity between planning and immediate pre-submit checks.
+  Retrieval time remains excluded, and calibration mutations remain
+  identity-changing.
+
+### Compatibility
+
+- Snapshot hashes and plans created by 0.7.2 remain immutable evidence under
+  that pinned release, but are not reusable with this corrected hash algorithm.
+  Re-resolve backend metadata, generate a new plan, and obtain a new approval;
+  never rewrite an existing snapshot, plan, or receipt in place.
+
 ## 0.7.2 — 2026-07-14
 
 ### Fixed

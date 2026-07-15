@@ -8,21 +8,21 @@ obtain a copy of this license in the LICENSE file in the root directory
 of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 -->
 
-# Experiment Compatibility — Runtime Research 0.7.2
+# Experiment Compatibility — Runtime Research 0.7.3
 
 This document is the Workstream 2 handoff contract for the immutable
-`runtime-research-v0.7.2` release.
+`runtime-research-v0.7.3` release.
 
 ## Exact dependency pin
 
 Use this PEP 508 requirement; do not depend on a branch:
 
 ```text
-qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.2#subdirectory=qiskit-ibm-runtime-mcp-server
+qiskit-ibm-runtime-mcp-server @ git+https://github.com/abbudjoe/mcp-servers.git@runtime-research-v0.7.3#subdirectory=qiskit-ibm-runtime-mcp-server
 ```
 
 Expected installed distribution/version:
-`qiskit-ibm-runtime-mcp-server==0.7.2`.
+`qiskit-ibm-runtime-mcp-server==0.7.3`.
 
 ## Runtime environment
 
@@ -57,6 +57,19 @@ compatibility shims, not the experiment execution contract.
 
 Validate persisted documents against the packaged draft 2020-12 schemas. Keep
 package version and schema version as separate provenance fields.
+
+## Snapshot identity
+
+`BackendSnapshot` continues to serialize the complete typed `backend_status`
+observation. `snapshot_content_hash` excludes that observation and
+`retrieved_at`, so queue movement, temporary availability, and status text do
+not invalidate unchanged target/calibration identity. Target structure,
+calibration data, historical-property time, and software/backend provenance
+remain hash-bound.
+
+Do not reuse a snapshot hash, plan, or approval created by 0.7.2 with 0.7.3.
+Preserve the old artifacts under their exact release pin, then perform a fresh
+metadata resolution, plan generation, and approval cycle.
 
 ## Supported execution modes
 

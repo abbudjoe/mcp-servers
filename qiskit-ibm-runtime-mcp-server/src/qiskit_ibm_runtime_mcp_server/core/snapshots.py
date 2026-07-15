@@ -413,10 +413,16 @@ def target_content_hash(snapshot: BackendSnapshot) -> str:
 
 
 def snapshot_content_hash(snapshot: BackendSnapshot) -> str:
-    """Hash stable snapshot content, excluding observation time and the hash itself."""
+    """Hash reproducible target/calibration content, not live observations.
+
+    ``backend_status`` remains part of the complete snapshot artifact, but its
+    queue depth, availability, and status text are volatile scheduling evidence.
+    They must not change the scientific/calibration identity used by callers to
+    bind compilation and execution.
+    """
     payload = snapshot.model_dump(mode="python")
-    payload.pop("snapshot_hash")
-    payload.pop("retrieved_at")
+    for observation_field in ("snapshot_hash", "retrieved_at", "backend_status"):
+        payload.pop(observation_field)
     return canonical_json_hash(payload)
 
 

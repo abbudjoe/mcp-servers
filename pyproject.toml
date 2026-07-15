@@ -1,6 +1,6 @@
 [project]
 name = "qiskit-mcp-servers"
-version = "0.12.2"
+version = "0.12.3"
 description = "Model Context Protocol servers for IBM Quantum services and Qiskit"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -26,7 +26,7 @@ classifiers = [
 dependencies = [
     "qiskit-mcp-server>=0.3.0,<0.4",
     "qiskit-docs-mcp-server>=0.2.0,<0.3",
-    "qiskit-ibm-runtime-mcp-server>=0.7.2,<0.8",
+    "qiskit-ibm-runtime-mcp-server>=0.7.3,<0.8",
     "qiskit-ibm-transpiler-mcp-server>=0.4.0,<0.5",
 ]
 
@@ -34,14 +34,14 @@ dependencies = [
 # Install individual servers
 qiskit = ["qiskit-mcp-server>=0.3.0,<0.4"]
 docs = ["qiskit-docs-mcp-server>=0.2.0,<0.3"]
-runtime = ["qiskit-ibm-runtime-mcp-server>=0.7.2,<0.8"]
+runtime = ["qiskit-ibm-runtime-mcp-server>=0.7.3,<0.8"]
 transpiler = ["qiskit-ibm-transpiler-mcp-server>=0.4.0,<0.5"]
 gym = ["qiskit-gym-mcp-server>=0.4.0,<0.5"]
 # Install all servers (core + community)
 all = [
     "qiskit-mcp-server>=0.3.0,<0.4",
     "qiskit-docs-mcp-server>=0.2.0,<0.3",
-    "qiskit-ibm-runtime-mcp-server>=0.7.2,<0.8",
+    "qiskit-ibm-runtime-mcp-server>=0.7.3,<0.8",
     "qiskit-ibm-transpiler-mcp-server>=0.4.0,<0.5",
     "qiskit-gym-mcp-server>=0.4.0,<0.5",
 ]

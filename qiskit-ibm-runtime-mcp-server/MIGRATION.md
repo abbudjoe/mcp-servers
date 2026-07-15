@@ -13,6 +13,20 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 Release 0.7.x intentionally breaks implicit live-execution and flattened-result
 contracts. Migrate the control plane before moving experiment code.
 
+## Stable snapshot identity in 0.7.3
+
+`BackendSnapshot.backend_status` remains complete serialized evidence, including
+operational availability, pending-job count, and status text. Those live
+scheduling observations no longer participate in `snapshot_content_hash`, just
+as retrieval time was already excluded. Target structure, calibration content,
+historical-property time, provenance, and other reproducible fields remain
+identity-bound.
+
+Snapshot hashes and plans produced by 0.7.2 remain immutable evidence under the
+0.7.2 pin, but they are not reusable with 0.7.3. Re-resolve backend metadata,
+generate a new plan, and obtain a new approval. Never rewrite an approved
+snapshot, plan, or receipt in place.
+
 ## Crash recovery in 0.7.2
 
 Persist the exact canonical `SubmissionPlan` before live submission. After a

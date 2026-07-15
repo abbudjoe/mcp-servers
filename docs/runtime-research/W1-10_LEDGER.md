@@ -99,3 +99,64 @@ of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
   `https://github.com/abbudjoe/mcp-servers/releases/tag/runtime-research-v0.7.2`.
 - Status: `met`; release `0.7.1` remains immutable but is not the W2
   recovery-safe pin. No QPU or cloud mutation was performed for this repair.
+
+## Stable snapshot-identity amendment
+
+- Status: `in-progress`; the local contract amendment passed, and immutable
+  patch-release 0.7.3 is now under assembly.
+- Live finding: W2-09 plan
+  `sha256:ad3854dab33ff40ac61bef12949e37b24a20ec78bb8ca716c42df9604810eaf9`
+  stopped before submission because `backend_status.pending_jobs` changed from
+  0 to 2 even though target and calibration content were unchanged. Actual QPU
+  usage and primitive submissions were both zero.
+- Root cause: `snapshot_content_hash()` excluded retrieval time but still owned
+  backend availability/queue observations as reproducible snapshot identity.
+  That made a scheduling observation silently override the scientific target
+  and calibration contract.
+- Target contract: retain the complete typed `backend_status` observation in
+  every snapshot artifact, but exclude the entire backend-status object from
+  the stable snapshot content hash. Queue depth, operational availability, and
+  status text are execution-time observations; target/calibration mutations
+  must continue to change identity.
+- Mapped DoD: W1-04 stable snapshot content hash and complete metadata capture;
+  W1-10 smoke-finding resolution, patch-release gates, exact immutable pin, and
+  independent spec-conformance review.
+- Evidence: focused regressions mutate every backend-status field and
+  retrieval time without changing identity, prove the full serialized snapshot
+  still captures those observations, and prove calibration mutation still
+  changes identity.
+- Focused snapshot smoke: 16 passed, one separately gated read-only provider
+  test skipped. Full Runtime suite: 408 passed, one gated skip. Ruff, format,
+  strict mypy, Bandit, lock check, and `git diff --check` passed.
+- Package evidence: wheel and sdist built successfully; the wheel contains the
+  corrected snapshot implementation and the sdist contains source, tests, and
+  changelog. An offline clean install reproduced the queue-depth regression and
+  returned `CLEAN_INSTALL_SNAPSHOT_IDENTITY_OK`.
+- Candidate 0.7.3 release matrix: Runtime 408 passed / one gated skip on each
+  Python 3.10–3.14; safety branch coverage on every interpreter remained
+  100.00% approvals, 91.07% budgeting, 90.91% Primitive parsing, and 100.00%
+  secret handling. Companion suites passed: qiskit 103, docs 173 with three
+  read-only integrations deselected, transpiler 139 with 52 integrations
+  deselected, and gym 97.
+- Candidate quality/release evidence: all-package Ruff, format, mypy, and Bandit
+  passed; the lock and its checksum passed; 37 generated schemas exactly match
+  the package; the offline example exported all 37. Two fixed-epoch builds were
+  byte-identical. Wheel and sdist each passed isolated Python 3.12 probes for
+  version, schemas, typed recovery, status-insensitive identity, and
+  calibration-sensitive identity.
+- Independent exact-candidate review: initially found one premature claim that
+  the not-yet-published tag had passed a remote-pin install. The manifest now
+  distinguishes completed local wheel/sdist probes from the pending
+  post-publication tag probe. Rereview result: `CLEAN`; all pre-publication rows
+  are met, with only tag identity and remote accessibility correctly blocked
+  until publication.
+- Independent assembly review: `CLEAN`; all four mapped amendment items met,
+  no schema/model change or status-evidence loss, and 0.7.2 compatibility
+  handling is explicit. Post-review source-contract smoke: 142 passed, one
+  gated skip; Ruff, format, and diff checks passed.
+- Release boundary: source and registry metadata now identify candidate 0.7.3.
+  Publication remains blocked until the complete release matrix, reproducible
+  builds, clean installs, exact candidate review, commit, and annotated-tag
+  audit pass. Existing 0.7.2 plans and receipts remain stale.
+- No provider, network, primitive, cloud, or QPU mutation is authorized or
+  required for this amendment.

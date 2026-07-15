@@ -8,7 +8,7 @@ obtain a copy of this license in the LICENSE file in the root directory
 of this source tree or at http://www.apache.org/licenses/LICENSE-2.0.
 -->
 
-# Runtime Research API 0.7.2
+# Runtime Research API 0.7.3
 
 The supported Python contract lives under
 `qiskit_ibm_runtime_mcp_server.core`. Private names and the unchecked primitive
@@ -33,7 +33,10 @@ Modes `exact` and `validate` do not invoke a pass manager.
 
 Snapshots include requested qubits, instruction/qubit tuples, properties,
 faults, target structure, timestamps, and package provenance. Historical reads
-require timezone-aware timestamps.
+require timezone-aware timestamps. `snapshot_content_hash` binds reproducible
+target/calibration content while excluding retrieval time and the complete typed
+`backend_status` observation. Queue depth, availability, and status text remain
+serialized evidence but cannot change scientific/calibration identity.
 
 ## Primitive V2 contracts
 
